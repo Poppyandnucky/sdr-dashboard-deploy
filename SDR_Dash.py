@@ -107,6 +107,7 @@ def clear_model_runtime_state(clear_comparison=True, clear_table=False):
     if clear_comparison:
         for key in comparison_keys:
             st.session_state.pop(key, None)
+        st.session_state.dual_first_config = None
         st.session_state.ab_base_df = None
         st.session_state.ab_base_ind_outcomes = None
 
