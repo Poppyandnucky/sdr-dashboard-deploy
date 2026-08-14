@@ -1,0 +1,10 @@
+services:
+  sdr-dashboard:
+    build: .
+    image: sdr-dashboard:local
+    ports:
+      - "${HOST_PORT:-8509}:8501"
+    environment:
+      PORT: "8501"
+      SDR_PARAMS_PATH: "/app/data/SDR Parameters.xlsx"
+    restart: unless-stopped
