@@ -76,6 +76,8 @@ If you replace the workbook later, rebuild and redeploy the image so the contain
 Using the Dashboard — Quick Overview
 -----------------------------------
 
+<img width="1912" height="817" alt="image" src="https://github.com/user-attachments/assets/3105697f-e16d-47b8-adbf-56b95b807198" />
+
 This section explains the dashboard controls, modes, and recommended usage patterns.
 
 Main layout and controls
@@ -88,6 +90,7 @@ Modes
 - Customize (Analyst) Mode: manually adjust sliders and toggles. In this mode, switches and sliders reflect the analyst's explicit choices. Many switches will use default slider values when first toggled on.
 
 Health System Strength (HSS) control
+<img width="1496" height="895" alt="image" src="https://github.com/user-attachments/assets/087d597a-c795-418a-bb65-1d91762f1d67" />
 - There are two HSS modes: `Preset` and `Customize`.
 - In `Customize`, sliders allow granular HSS adjustments (coverage, access, quality). Use the collapse/expand control next to each group to hide or show detailed sliders.
 - The collapse/expand control: click the chevron or section title to collapse (hide) or expand (show) the sliders for that group.
@@ -100,6 +103,7 @@ Intervention groups
 - Combined HSS + Intervention experiments: you can enable `Low/High/No HSS` in the momish or treatment panels to explore combined effects. This is useful to test whether an intervention performs differently under weak versus strong health systems.
 
 Outcome comparison modes
+<img width="511" height="311" alt="Screenshot 2026-08-18 at 14 18 39" src="https://github.com/user-attachments/assets/e2dc40e4-fd35-42d5-af6a-8bc699bf3ad6" />
 - Baseline vs User Settings: Compare model outputs when all interventions are OFF (baseline) versus the current dashboard settings. This mode shows the incremental effect of your configuration.
 - Scenario A vs Scenario B: Compare two saved or current configurations side-by-side. Use `Save as A` / `Save as B` or rename the scenario labels to meaningful names (e.g., "Intervention package A: Community + antibiotics").
   - To rename scenario A or B: open the comparison panel and edit the label text.
@@ -111,6 +115,7 @@ Running the model
 - If you change many settings, click `Reset Model` or `Clear Cache` before running to ensure no stale cached results affect your run.
 
 Exporting results (CSV)
+<img width="756" height="516" alt="Screenshot 2026-08-18 at 14 19 07" src="https://github.com/user-attachments/assets/064a0871-77b1-48dc-9167-4ea234864c38" />
 - After running a model, you can export results to CSV using the `Export CSV` or `Download` button.
 - CSV contents typically include:
   - Run ID and timestamp
@@ -123,6 +128,7 @@ Exporting results (CSV)
 - Use the CSV to post-process results in Excel, Python, or R. Filenames include the timestamp and scenario name for traceability.
 
 Useful UI tips
+
 - `All` mode: includes all counties or regions in a single sweep run if the app supports it. This is useful for broad comparisons, but runs may take longer.
 - Preset mode is recommended for reproducible comparisons — presets use fixed default slider values chosen by analysts.
 - Analyst mode defaults: many toggles that enable an intervention will populate the slider with a recommended default value the first time they are turned on.
