@@ -584,6 +584,9 @@ def render_prompts_preset():
 
 
 # Function to render HSS interventions
+def _stacked_containers(count):
+    return [st.container() for _ in range(count)]
+
 def render_hss(preset_demand_scenario, preset_supply_scenario):
     # Scenario default values
     Demand_scenarios = {
@@ -604,7 +607,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
         "Aggressive": 42.5
     }
 
-    col1, col2 = st.columns(2)
+    col1, col2 = _stacked_containers(2)
     with col1:
         st.subheader(":chart_with_upwards_trend: HSS interventions (Demand)",
                      help = "Goal: Increase pregnant mothers' demand for \n\n Antenatal Care (ANC) and deliveries at L4/5 facilties")
@@ -622,7 +625,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
             P_ANC_preset_value = None
             P_L45_preset_value = None
 
-        col1_1, col1_2 = st.columns(2)
+        col1_1, col1_2 = _stacked_containers(2)
         with col1_1:
             st.text('Apply interventions')
             CHVint = st.toggle('Employ CHVs', value = Employ_CHV,
@@ -637,7 +640,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
                 i_flags['flag_CHV'] = 1
             else:
                 i_flags['flag_CHV'] = 0
-        col1_3, col1_4 = st.columns(2)
+        col1_3, col1_4 = _stacked_containers(2)
 
         with col1_3:
             ANC_int = st.checkbox('Increasing 4+ANC visits', value = Increase_ANC,
@@ -661,7 +664,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
             else:
                 P_L45_slider = round(slider_params['base_p_45_slider'] * 100)
 
-        col1_5, col1_6 = st.columns(2)
+        col1_5, col1_6 = _stacked_containers(2)
         with col1_5:
             LB_int = st.checkbox('Increasing live births in L4/5 facilities', value = Increase_LB45,
                                  ) if CHVint else 0
@@ -699,7 +702,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
         # # st.markdown("---")
         # # st.text("PROMPTS (Engagement program)")
 
-        # colP1, colP2 = st.columns(2)
+        # colP1, colP2 = _stacked_containers(2)
         # with colP1:
         #     prompts_int = st.checkbox(
         #         "Enable PROMPTS",
@@ -756,7 +759,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
         #     i_HSS["chv_engagement"] = 0.0
         #     i_HSS["intervention_fidelity"] = 0.0
 
-        col1_7, col1_8 = st.columns(2)
+        col1_7, col1_8 = _stacked_containers(2)
         with col1_7:
             if CHVint:
                 i_HSS['CHV_memory'] = st.selectbox("**CHV memory decay model**",
@@ -812,7 +815,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
             equipment_value = 0
             refer_value = 0
 
-        col2_1, col2_2 = st.columns(2)
+        col2_1, col2_2 = _stacked_containers(2)
         with col2_1:
             st.text('Apply interventions')
             facint = st.toggle('Upgrade L4/5 facilities', value = upgrade_L45_facilities,
@@ -823,7 +826,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
         with col2_2:
             st.text('Adjust parameters')
 
-        col2_3, col2_4 = st.columns(2)
+        col2_3, col2_4 = _stacked_containers(2)
         with col2_3:
             if facint:
                 performanceint = st.checkbox('Improve performance of healthcare workers', value = upgrade_performance,
@@ -844,7 +847,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
                 i_flags['flag_performance'] = 0
                 i_HSS["knowledge"] = slider_params['base_knowledge_L45_slider']
 
-        col2_5, col2_6 = st.columns(2)
+        col2_5, col2_6 = _stacked_containers(2)
         with col2_5:
             if facint:
                 capacityint = st.checkbox('Increase facility capacity', value = upgrade_capacity,
@@ -862,7 +865,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
                 i_flags['flag_capacity'] = 0
                 i_HSS["capacity_added"] = 0
 
-        col2_7, col2_8 = st.columns(2)
+        col2_7, col2_8 = _stacked_containers(2)
         with col2_7:
             if facint:
                 laborint = st.checkbox('Increase number of skilled labor force', value = upgrade_labor,
@@ -881,7 +884,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
                 i_flags['flag_labor'] = 0
                 i_HSS["labor_ratio"] = 0
 
-        col2_9, col2_10 = st.columns(2)
+        col2_9, col2_10 = _stacked_containers(2)
         with col2_9:
             if facint:
                 equipment_int = st.checkbox('Increasing equipment in L4/5 facilities', value = upgrade_equipment,
@@ -901,7 +904,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
                 i_HSS["sensor_ratio"] = 0
 
         st.markdown("---")
-        col2_11, col2_12 = st.columns(2)
+        col2_11, col2_12 = _stacked_containers(2)
         with col2_11:
             refint = st.toggle('Upgrade Rescue network', value = update_transport,
                                  help="To support the increased referrals/transfers \n\n from home or L2/3 facilities to L4/5 facilities")
@@ -910,7 +913,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
             if refint:
                 i_flags['flag_SDR'] = 1
 
-        col2_13, col2_14 = st.columns(2)
+        col2_13, col2_14 = _stacked_containers(2)
         with col2_13:
             if refint:
                 referint = st.checkbox('Improve referral capacity', value = update_refer,
@@ -927,7 +930,7 @@ def render_hss(preset_demand_scenario, preset_supply_scenario):
                 i_flags['flag_refer_voucher'] = 0
                 i_HSS["P_refer"] = 0
 
-        col2_15, col2_16 = st.columns(2)
+        col2_15, col2_16 = _stacked_containers(2)
         with col2_15:
             if referint:
                 transfer_capacity_int = st.checkbox(
@@ -1391,11 +1394,11 @@ def render_prompts():
 
 # Function to render Single Interventions
 def render_single():
-    col1, col2 = st.columns(2)
+    col1, col2 = _stacked_containers(2)
     with col1:
         st.subheader(":pill: Treatment interventions (Drugs and Supplies)",
                      help = "Goal: Address leading biomedical causes of maternal and neonatal death")
-        col1_1, col1_2 = st.columns(2)
+        col1_1, col1_2 = _stacked_containers(2)
 
         with col1_1:
             mat_interventions = {
@@ -1464,7 +1467,7 @@ def render_single():
     with col2:
         st.subheader(":stethoscope: Diagnosis interventions (Sensors and Monitoring)",
                      help = "Goal: Increase diagnosis of high-risk pregnancies and complications")
-        col2_1, col2_2 = st.columns(2)
+        col2_1, col2_2 = _stacked_containers(2)
         with col2_1:
             st.text('Apply interventions')
             intus = st.toggle('AI portable ultrasound (AI-US)',
@@ -1498,7 +1501,7 @@ def render_single():
             i_flags['flag_sensor_ai'] = 0
 
         if AI_sensor:
-            col2_3, col2_4 = st.columns(2)
+            col2_3, col2_4 = _stacked_containers(2)
             with col2_3:
                 pass
             with col2_4:
