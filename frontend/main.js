@@ -29,7 +29,13 @@ function emit(type, includeConfig = true) {
     eventId: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
     type,
   };
-  if (includeConfig) value.config = resolveModelConfig(ui, defaultConfig);
+  if (includeConfig) {
+    value.config = resolveModelConfig(
+      ui,
+      defaultConfig,
+      bootstrap.countyDefaultsByCounty
+    );
+  }
   send(value);
 }
 
@@ -87,6 +93,32 @@ function initialUI(state) {
   };
 }
 
+function applyCountyDefaults(county) {
+  const defaults = bootstrap.countyDefaultsByCounty?.[county];
+  if (!defaults) return;
+  ui.hss.pANCPercent = Math.round(Number(defaults.basePANC) * 100);
+  ui.hss.pL45Percent = Math.round(Number(defaults.basePL45) * 100);
+  ui.hss.performancePercent = Math.round(Number(defaults.baseKnowledge) * 100);
+}
+
+function renderCountyDefaults() {
+  const defaults = bootstrap.countyDefaultsByCounty?.[ui.county];
+  if (!defaults) return '<div class="status">No county defaults available.</div>';
+  const percent = value => `${(Number(value || 0) * 100).toFixed(1)}%`;
+  const values = [
+    ["Baseline ANC", percent(defaults.basePANC)],
+    ["Baseline L4/5 delivery", percent(defaults.basePL45)],
+    ["Baseline worker knowledge", percent(defaults.baseKnowledge)],
+    ["Current PROMPTS", percent(defaults.promptsImplementationIndex)],
+    ["Current MENTORS", percent(defaults.mentorsImplementationIndex)],
+    ["Current PULSE", percent(defaults.pulseImplementationIndex)],
+    ["Current FQA", percent(defaults.fqaImplementationIndex)],
+    ["Current referral", percent(defaults.referralImplementationIndex)],
+  ];
+  return `<div class="help">These values come from the parameter workbook and update locally when the county changes.</div>
+    <div class="defaults-grid">${values.map(([label, value]) => `<div class="default-value">${esc(label)}<strong>${esc(value)}</strong></div>`).join("")}</div>`;
+}
+
 function field(label, path, value, type = "number", attributes = "") {
   return `<div class="field"><label>${esc(label)}</label><input data-path="${path}" type="${type}" value="${esc(value)}" ${attributes}></div>`;
 }
@@ -135,7 +167,7 @@ function renderHSS() {
 function render() {
   const counties = (bootstrap.countyOptions || []).map(county => `<option ${selected(county, ui.county)}>${esc(county)}</option>`).join("");
   const result = bootstrap.results;
-  app.innerHTML = `<fieldset><legend>Location</legend><div class="field"><label>County</label><select data-path="county">${counties}</select></div></fieldset>
+  app.innerHTML = `<fieldset><legend>Location</legend><div class="field"><label>County</label><select data-path="county">${counties}</select></div>${renderCountyDefaults()}</fieldset>
     ${renderHSS()}
     <fieldset><legend>Treatment interventions</legend>${treatment("pphBundle", "PPH bundle")}${treatment("ivIron", "IV iron")}${treatment("magnesiumSulfate", "Magnesium sulfate")}${treatment("antibiotics", "Antibiotics")}${treatment("oxytocin", "Oxytocin")}</fieldset>
     <fieldset><legend>Diagnosis</legend>${toggle("AI portable ultrasound", "diagnosis.ultrasound.enabled", ui.diagnosis.ultrasound.enabled)}${ui.diagnosis.ultrasound.enabled ? `${field("Ultrasound sensitivity", "diagnosis.ultrasound.sensitivity", ui.diagnosis.ultrasound.sensitivity, "number", 'min="0" max="1" step="0.05"')}${field("Ultrasound specificity", "diagnosis.ultrasound.specificity", ui.diagnosis.ultrasound.specificity, "number", 'min="0" max="1" step="0.05"')}` : ""}
@@ -155,6 +187,7 @@ function render() {
     let target = ui;
     path.slice(0, -1).forEach(key => target = target[key]);
     target[path.at(-1)] = element.type === "checkbox" ? element.checked : element.type === "number" ? Number(element.value) : element.value;
+    if (element.dataset.path === "county") applyCountyDefaults(element.value);
     if (element.dataset.path === "momish.fqaPulseModifierLevel") ui.momish.fqaPulseModifier = bootstrap.fqaPulseModifierOptions[element.value];
     render();
   }));

@@ -5,4 +5,8 @@ __pycache__/
 .venv*/
 .env
 .DS_Store
+.idea
 .streamlit/secrets.toml
+deploy.sh
+gcloud_configure.sh
+sdr_results_*.json

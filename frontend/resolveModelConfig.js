@@ -15,27 +15,34 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value)));
 const proportion = value => clamp(value, 0, 100) / 100;
 
+function getPL45FromANC(pANC, countyDefaults) {
+  const match = (countyDefaults.pL45AncPairs || []).find(
+    ([anc]) => Math.abs(Number(anc) - Number(pANC)) < 1e-9
+  );
+  return match ? Number(match[1]) : null;
+}
+
 function currentOrOverride(level, currentValue) {
   return OVERRIDE[level] ?? clamp(currentValue ?? 0, 0, 1);
 }
 
-function resetHSS(config, base) {
+function resetHSS(config, countyDefaults) {
   Object.assign(config.flags, {
     flag_SDR: 0, flag_CHV: 0, flag_ANC: 0, flag_LB: 0,
     flag_performance: 0, flag_capacity: 0, flag_labor: 0,
     flag_equipment: 0, flag_refer_voucher: 0, flag_transfer_capacity: 0,
   });
   Object.assign(config.HSS, {
-    P_ANC: base.HSS.P_ANC, P_L45: base.HSS.P_L45,
-    knowledge: base.HSS.knowledge, capacity_added: 0,
+    P_ANC: countyDefaults.basePANC, P_L45: countyDefaults.basePL45,
+    knowledge: countyDefaults.baseKnowledge, capacity_added: 0,
     labor_ratio: 0, sensor_ratio: 0, P_refer: 0,
     transfer_capacity_target: 0, tau_decay: 6,
     CHV_memory: "Always Forget",
   });
 }
 
-function applyPreset(config, base, demandName, supplyName) {
-  resetHSS(config, base);
+function applyPreset(config, countyDefaults, demandName, supplyName) {
+  resetHSS(config, countyDefaults);
   const demand = DEMAND[demandName] || DEMAND.Conservative;
   const match = supplyName === "Match Demand";
   Object.assign(config.flags, {
@@ -43,9 +50,11 @@ function applyPreset(config, base, demandName, supplyName) {
     flag_performance: 1, flag_capacity: 1, flag_labor: 1,
     flag_equipment: 1, flag_refer_voucher: 1, flag_transfer_capacity: 1,
   });
+  const pANC = demand.pANC / 100;
+  const minimumPL45 = getPL45FromANC(pANC, countyDefaults) ?? 0;
   Object.assign(config.HSS, {
-    P_ANC: demand.pANC / 100,
-    P_L45: demand.pL45 / 100,
+    P_ANC: pANC,
+    P_L45: Math.max(demand.pL45 / 100, minimumPL45),
     knowledge: match ? 1 : 0.75,
     capacity_added: (match ? CAPACITY_MATCH[demandName] : CAPACITY_MISMATCH[demandName]) / 100,
     labor_ratio: match ? 1 : 0.5,
@@ -57,8 +66,8 @@ function applyPreset(config, base, demandName, supplyName) {
   });
 }
 
-function resolveManualHSS(config, base, hss) {
-  resetHSS(config, base);
+function resolveManualHSS(config, countyDefaults, hss) {
+  resetHSS(config, countyDefaults);
   if (hss.employCHV) {
     config.flags.flag_SDR = 1;
     config.flags.flag_CHV = 1;
@@ -68,8 +77,12 @@ function resolveManualHSS(config, base, hss) {
     }
     if (hss.increaseL45Delivery) {
       config.flags.flag_LB = 1;
-      // The county-specific ANC→L4/5 minimum will be added to bootstrap later.
-      config.HSS.P_L45 = proportion(hss.pL45Percent);
+      const minimumPL45 = getPL45FromANC(config.HSS.P_ANC, countyDefaults)
+        ?? 0;
+      config.HSS.P_L45 = Math.max(
+        proportion(hss.pL45Percent),
+        minimumPL45
+      );
       config.HSS.tau_decay = clamp(hss.memoryDecayMonths, 1, 36);
       config.HSS.CHV_memory = hss.chvMemoryModel;
     }
@@ -138,7 +151,7 @@ function resolveDiagnostics(config, diagnosis) {
   }
 }
 
-function resolveMomish(config, base, momish) {
+function resolveMomish(config, countyDefaults, momish) {
   const programs = {
     prompts: ["flag_PROMPTS", "prompts_implementation_index"],
     mentors: ["flag_MENTOR", "mentor_implementation_index"],
@@ -148,9 +161,16 @@ function resolveMomish(config, base, momish) {
   };
   for (const [name, [flag, parameter]] of Object.entries(programs)) {
     const item = momish[name];
+    const currentValues = {
+      prompts: countyDefaults.promptsImplementationIndex,
+      mentors: countyDefaults.mentorsImplementationIndex,
+      pulse: countyDefaults.pulseImplementationIndex,
+      fqa: countyDefaults.fqaImplementationIndex,
+      transfer: countyDefaults.referralImplementationIndex,
+    };
     config.flags[flag] = item.enabled ? 1 : 0;
     config.HSS[parameter] = item.enabled
-      ? currentOrOverride(item.level, base.HSS[parameter]) : 0;
+      ? currentOrOverride(item.level, currentValues[name]) : 0;
   }
   config.HSS.prompts_rr_anc4p = momish.prompts.enabled
     ? PROMPTS_RR[momish.prompts.level] : 1;
@@ -163,24 +183,25 @@ function resolveMomish(config, base, momish) {
   config.HSS.pulse_implementation_boost = PULSE_BOOST[momish.pulseBoostLevel];
 }
 
-export function resolveModelConfig(ui, defaultConfig) {
+export function resolveModelConfig(ui, defaultConfig, countyDefaultsByCounty) {
   const config = clone(defaultConfig);
-  const base = clone(defaultConfig);
   config.county = ui.county;
+  const countyDefaults = countyDefaultsByCounty[ui.county];
+  if (!countyDefaults) throw new Error(`No defaults were provided for county: ${ui.county}`);
 
   if (ui.hss.mode === "preset") {
-    applyPreset(config, base, ui.hss.demandPreset, ui.hss.supplyScenario);
+    applyPreset(config, countyDefaults, ui.hss.demandPreset, ui.hss.supplyScenario);
   } else {
-    resolveManualHSS(config, base, ui.hss);
+    resolveManualHSS(config, countyDefaults, ui.hss);
   }
 
   resolveTreatments(config, ui.treatments);
   resolveDiagnostics(config, ui.diagnosis);
-  resolveMomish(config, base, ui.momish);
+  resolveMomish(config, countyDefaults, ui.momish);
 
-  if (ui.momish.facilityContext === "off") resetHSS(config, base);
-  if (ui.momish.facilityContext === "low") applyPreset(config, base, "Conservative", "Match Demand");
-  if (ui.momish.facilityContext === "high") applyPreset(config, base, "Aggressive", "Match Demand");
+  if (ui.momish.facilityContext === "off") resetHSS(config, countyDefaults);
+  if (ui.momish.facilityContext === "low") applyPreset(config, countyDefaults, "Conservative", "Match Demand");
+  if (ui.momish.facilityContext === "high") applyPreset(config, countyDefaults, "Aggressive", "Match Demand");
 
   const implementationYears = Math.round(clamp(ui.model.implementationYears, 3, 6));
   const maintenanceYears = Math.round(clamp(ui.model.maintenanceYears, 0, 3));

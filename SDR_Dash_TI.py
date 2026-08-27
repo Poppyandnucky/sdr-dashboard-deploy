@@ -1730,6 +1730,32 @@ def _html_ui_state():
     })
 
 
+@st.cache_data(show_spinner=False)
+def _html_county_defaults(county):
+    """Collect existing workbook defaults needed by linked frontend controls."""
+    county_sliders = get_slider_params(county=county)
+    county_parameters = calculate_derived_parameters(
+        get_parameters(rng=np.random.default_rng(0), county=county)
+    )
+    return _json_safe({
+        "basePANC": county_sliders["p_ANC_base_slider"],
+        "basePL45": county_sliders["base_p_45_slider"],
+        "baseKnowledge": county_sliders["base_knowledge_L45_slider"],
+        "pL45AncPairs": county_sliders["p_l45_anc_slider"],
+        "promptsImplementationIndex": county_parameters.get("prompts_implementation_index", 0.0),
+        "mentorsImplementationIndex": county_parameters.get("mentors_implementation_index", 0.0),
+        "pulseImplementationIndex": county_parameters.get("pulse_implementation_index", 0.0),
+        "fqaImplementationIndex": county_parameters.get("fqa_implementation_index", 0.0),
+        "referralImplementationIndex": county_parameters.get("referral_implementation_index", 0.0),
+    })
+
+
+@st.cache_data(show_spinner=False)
+def _html_all_county_defaults(counties):
+    """Build one bootstrap map so county changes require no backend round trip."""
+    return {county: _html_county_defaults(county) for county in counties}
+
+
 def _apply_html_ui_state(config):
     """Validate and apply configuration received from the JavaScript component."""
     global selected_county
@@ -1765,6 +1791,7 @@ def _run_html_model():
     n_months = MODEL["n_months"]
     int_period = MODEL["int_period"]
     seeds = make_shifted_run_seeds(n_runs, n_months)
+    run_slider_params = get_slider_params(county=selected_county)
     baseline_frames, intervention_frames = [], []
     baseline_individual, intervention_individual = [], []
 
@@ -1778,8 +1805,8 @@ def _run_html_model():
         b_flags = reset_flags()
         b_param.update({
             "E": reset_E(),
-            "S": reset_S(slider_params),
-            "HSS": reset_HSS(slider_params),
+            "S": reset_S(run_slider_params),
+            "HSS": reset_HSS(run_slider_params),
         })
         b_df, b_ind, _ = run_model_dash(
             b_param, b_flags, n_months, int_period, base_seed=monthly_seeds
@@ -1961,6 +1988,7 @@ def render_html_component_app():
         bootstrap=_json_safe({
             "countyOptions": county_options,
             "defaultCounty": DEFAULT_COUNTY,
+            "countyDefaultsByCounty": _html_all_county_defaults(tuple(county_options)),
             "fqaPulseModifierOptions": FQA_PULSE_MODIFIER_OPTIONS,
             "pulseImplementationBoostOptions": PULSE_IMPLEMENTATION_BOOST_OPTIONS,
             "state": _html_ui_state(),

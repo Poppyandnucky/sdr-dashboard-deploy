@@ -49,6 +49,21 @@ button:disabled { opacity: .55; cursor: wait; }
   white-space: pre-wrap;
 }
 
+.defaults-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.default-value {
+  padding: 8px;
+  border: 1px solid #aaa;
+  background: #f7f7f7;
+}
+
+.default-value strong { display: block; margin-top: 3px; }
+
 pre {
   max-height: 360px;
   overflow: auto;
