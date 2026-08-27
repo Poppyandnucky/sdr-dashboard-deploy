@@ -1,8 +1,14 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import numpy as np
 import pandas as pd
 import altair as alt
 import math
+import json
+import os
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
 import scipy.stats as stats
 import time
 import copy
@@ -26,19 +32,92 @@ ENABLE_PARAM_DEBUG_REPORT = True
 DASHBOARD_RANDOM_MASTER_SEED = 2025
 DASHBOARD_RANDOM_RUN_OFFSET = 20
 
-st.set_page_config(layout="wide")
+st.set_page_config(
+    page_title="SDR Planning Studio",
+    page_icon="✦",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 selected_plot = None
+
+# HTML/JS component configuration. During frontend development, point
+# SDR_HTML_UI_URL at Ayo's dev server (for example http://localhost:3000).
+# For deployment, set SDR_HTML_UI_BUILD_DIR to the compiled static directory.
+HTML_UI_DEV_URL = os.getenv("SDR_HTML_UI_URL", "").strip()
+HTML_UI_BUILD_DIR = os.getenv("SDR_HTML_UI_BUILD_DIR", "").strip()
+HTML_UI_ENABLED = os.getenv("SDR_USE_HTML_UI", "1").strip().lower() not in {"0", "false", "no"}
+
+
+def render_html_interface():
+    """Apply the HTML/CSS presentation layer without changing model behavior."""
+    st.markdown(
+        """
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap');
+        :root { --sdr-ink:#18332e; --sdr-muted:#64756f; --sdr-green:#17745d; --sdr-green-dark:#105846; --sdr-coral:#e7765b; --sdr-cream:#f7f5ef; --sdr-line:#dfe8e4; --sdr-white:#fff; }
+        html, body, [class*="css"] { font-family:"DM Sans",sans-serif; }
+        .stApp { background:var(--sdr-cream); color:var(--sdr-ink); }
+        .main .block-container { max-width:1480px; padding:2.2rem 3rem 5rem; }
+        h1,h2,h3,[data-testid="stHeadingWithActionElements"] { font-family:"Manrope",sans-serif; color:var(--sdr-ink); letter-spacing:-.025em; }
+        .sdr-hero { position:relative; overflow:hidden; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2rem; align-items:end; margin:0 0 1.5rem; padding:2.25rem 2.5rem; border:1px solid rgba(255,255,255,.12); border-radius:24px; color:#fff; background:radial-gradient(circle at 87% 12%,rgba(231,118,91,.62),transparent 24%),linear-gradient(125deg,#123e35 0%,#176b57 62%,#208970 100%); box-shadow:0 22px 55px rgba(24,51,46,.16); }
+        .sdr-hero::after { content:""; position:absolute; width:260px; height:260px; right:-100px; bottom:-170px; border:42px solid rgba(255,255,255,.08); border-radius:50%; }
+        .sdr-eyebrow { margin-bottom:.75rem; font-size:.75rem; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:#bfe7d8; }
+        .sdr-hero h1 { margin:0; color:#fff; font:800 clamp(2rem,4vw,3.65rem)/1.02 "Manrope",sans-serif; letter-spacing:-.055em; }
+        .sdr-hero p { max-width:700px; margin:1rem 0 0; color:rgba(255,255,255,.82); font-size:1.02rem; line-height:1.65; }
+        .sdr-status { position:relative; z-index:1; min-width:190px; padding:1rem 1.15rem; border:1px solid rgba(255,255,255,.22); border-radius:16px; background:rgba(8,42,34,.28); backdrop-filter:blur(9px); }
+        .sdr-status strong { display:block; margin-bottom:.2rem; font-size:.92rem; }
+        .sdr-status span { color:rgba(255,255,255,.7); font-size:.78rem; }
+        .sdr-dot { display:inline-block; width:8px; height:8px; margin-right:7px; border-radius:50%; background:#7ce0b8; box-shadow:0 0 0 5px rgba(124,224,184,.12); }
+        .sdr-steps { display:flex; flex-wrap:wrap; gap:.6rem; margin:0 0 1.65rem; }
+        .sdr-step { padding:.55rem .8rem; border:1px solid var(--sdr-line); border-radius:999px; background:rgba(255,255,255,.72); color:var(--sdr-muted); font-size:.78rem; font-weight:700; }
+        .sdr-step b { color:var(--sdr-green); margin-right:.3rem; }
+        [data-testid="stVerticalBlockBorderWrapper"] { border-color:var(--sdr-line)!important; border-radius:18px!important; background:rgba(255,255,255,.72); }
+        [data-testid="stExpander"] { overflow:hidden; border:1px solid var(--sdr-line); border-radius:16px; background:var(--sdr-white); box-shadow:0 8px 28px rgba(24,51,46,.055); }
+        [data-testid="stExpander"] details summary { padding:.3rem .35rem; }
+        div[data-baseweb="select"]>div,[data-testid="stNumberInput"] input,[data-testid="stTextInput"] input { border-color:#cedbd6; border-radius:11px; background:#fff; }
+        .stButton>button,.stFormSubmitButton>button,.stDownloadButton>button { min-height:2.65rem; border:1px solid #c8d8d2; border-radius:11px; color:var(--sdr-ink); background:#fff; font-weight:700; transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease; }
+        .stButton>button:hover,.stFormSubmitButton>button:hover,.stDownloadButton>button:hover { transform:translateY(-1px); border-color:var(--sdr-green); color:var(--sdr-green-dark); box-shadow:0 8px 18px rgba(23,116,93,.12); }
+        .stFormSubmitButton>button[kind="primary"],button[kind="primary"] { border-color:var(--sdr-green); color:#fff; background:var(--sdr-green); }
+        [data-testid="stMetric"] { padding:1rem; border:1px solid var(--sdr-line); border-radius:14px; background:#fff; }
+        hr { border-color:var(--sdr-line)!important; }
+        [data-testid="stSidebar"] { border-right:1px solid #d6e2dd; background:#eef5f1; }
+        [data-testid="stSidebar"]>div:first-child { padding-top:1.25rem; }
+        [data-testid="stSidebar"] .stButton>button { width:100%; text-align:left; }
+        .sdr-side-brand { margin:.25rem 0 1rem; padding:.95rem 1rem; border-radius:14px; color:#fff; background:var(--sdr-ink); }
+        .sdr-side-brand strong { display:block; font:700 1rem "Manrope",sans-serif; }
+        .sdr-side-brand span { color:#b9d3ca; font-size:.75rem; }
+        @media (max-width:760px) { .main .block-container { padding:1.2rem 1rem 3rem; } .sdr-hero { grid-template-columns:1fr; padding:1.6rem; border-radius:18px; } .sdr-status { display:none; } }
+        </style>
+        <section class="sdr-hero" aria-labelledby="sdr-title">
+          <div><div class="sdr-eyebrow">Maternal health decision support</div><h1 id="sdr-title">SDR Planning Studio</h1><p>Explore intervention strategies, simulate health-system impact, and turn model outputs into decisions for safer delivery care.</p></div>
+          <div class="sdr-status" aria-label="Application status"><strong><i class="sdr-dot"></i>Planning workspace</strong><span>Configure scenarios in the control panel</span></div>
+        </section>
+        <nav class="sdr-steps" aria-label="Workflow">
+          <span class="sdr-step"><b>01</b> Choose county</span><span class="sdr-step"><b>02</b> Build intervention</span><span class="sdr-step"><b>03</b> Run simulation</span><span class="sdr-step"><b>04</b> Review outcomes</span>
+        </nav>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+if not HTML_UI_ENABLED:
+    render_html_interface()
 
 FQA_PULSE_MODIFIER_OPTIONS = get_fqa_pulse_modifier_options()
 
 county_options = get_available_counties()
 if DEFAULT_COUNTY not in county_options:
     county_options = [DEFAULT_COUNTY] + county_options
-selected_county = st.selectbox(
-    "County",
-    county_options,
-    index=county_options.index(DEFAULT_COUNTY),
-)
+if HTML_UI_ENABLED:
+    selected_county = st.session_state.get("html_selected_county", DEFAULT_COUNTY)
+else:
+    st.markdown("#### Select planning area")
+    selected_county = st.selectbox(
+        "County",
+        county_options,
+        index=county_options.index(DEFAULT_COUNTY),
+        help="Baseline population and health-system parameters are loaded for this county.",
+    )
 
 MODEL = {
     "imple_time": 3,
@@ -48,6 +127,9 @@ MODEL = {
     "multiple_run": False,
     "n_runs": 1,
 }
+if HTML_UI_ENABLED:
+    MODEL["int_period"] = MODEL["imple_time"] * 12
+    MODEL["n_months"] = MODEL["int_period"] + MODEL["main_time"] * 12
 
 #initalize intervention parameters
 #b_param = get_parameters(seed = 1)
@@ -1569,6 +1651,368 @@ def render_single():
                                            help="Value = 0.95 means AI-US can detect 95% of pre-labor complications")
 
 
+HTML_UI_PROTOCOL_VERSION = 1
+HTML_UI_MAX_ROWS = int(os.getenv("SDR_HTML_UI_MAX_ROWS", "50000"))
+
+# Component protocol (v1): Streamlit sends `bootstrap` as a component argument.
+# The frontend responds with Streamlit.setComponentValue({
+#   eventId: crypto.randomUUID(),
+#   type: "ready" | "stateChanged" | "runModel" | "reset",
+#   config: {county, flags, E, S, HSS, model}
+# }). `config` is required for stateChanged/runModel. Results return on the next
+# render as bootstrap.results, with each dataframe represented by
+# {columns, rows, rowCount, truncated}. The frontend should call
+# Streamlit.setFrameHeight(...) whenever its layout height changes.
+
+
+def _merge_known_values(target, incoming):
+    """Copy only keys already present in a model configuration dictionary."""
+    if not isinstance(incoming, dict):
+        return
+    for key, value in incoming.items():
+        if key not in target:
+            continue
+        if isinstance(target[key], dict) and isinstance(value, dict):
+            _merge_known_values(target[key], value)
+        elif isinstance(target[key], np.ndarray):
+            target[key] = np.asarray(value, dtype=target[key].dtype)
+        elif isinstance(target[key], tuple) and isinstance(value, list):
+            target[key] = tuple(value)
+        else:
+            target[key] = value
+
+
+def _json_safe(value):
+    """Recursively convert NumPy/Pandas values into component-safe JSON values."""
+    if isinstance(value, np.ndarray):
+        return [_json_safe(item) for item in value.tolist()]
+    if isinstance(value, np.generic):
+        return _json_safe(value.item())
+    if isinstance(value, (pd.Timestamp, datetime)):
+        return value.isoformat()
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if pd.isna(value):
+        return None
+    return str(value)
+
+
+def _frame_for_html(frame):
+    """Return a JSON-safe dataframe payload for the component."""
+    if frame is None:
+        return None
+    truncated = len(frame) > HTML_UI_MAX_ROWS
+    export = frame.head(HTML_UI_MAX_ROWS)
+    return {
+        "columns": list(export.columns),
+        "rows": json.loads(export.to_json(orient="records", date_format="iso")),
+        "rowCount": int(len(frame)),
+        "truncated": truncated,
+    }
+
+
+def _html_ui_state():
+    return _json_safe({
+        "county": st.session_state.get("html_selected_county", DEFAULT_COUNTY),
+        "flags": copy.deepcopy(i_flags),
+        "E": copy.deepcopy(i_E),
+        "S": copy.deepcopy(i_S),
+        "HSS": copy.deepcopy(i_HSS),
+        "model": copy.deepcopy(st.session_state.get("html_model", MODEL)),
+    })
+
+
+def _apply_html_ui_state(config):
+    """Validate and apply configuration received from the JavaScript component."""
+    global selected_county
+    if not isinstance(config, dict):
+        raise ValueError("The component config must be an object.")
+
+    county = config.get("county", st.session_state.get("html_selected_county", DEFAULT_COUNTY))
+    if county not in county_options:
+        raise ValueError(f"Unknown county: {county}")
+    selected_county = county
+    st.session_state.html_selected_county = county
+
+    _merge_known_values(i_flags, config.get("flags"))
+    _merge_known_values(i_E, config.get("E"))
+    _merge_known_values(i_S, config.get("S"))
+    _merge_known_values(i_HSS, config.get("HSS"))
+
+    model = copy.deepcopy(MODEL)
+    _merge_known_values(model, config.get("model"))
+    model["imple_time"] = int(np.clip(model["imple_time"], 3, 6))
+    model["main_time"] = int(np.clip(model["main_time"], 0, 3))
+    model["n_runs"] = int(np.clip(model["n_runs"], 1, 300))
+    model["int_period"] = model["imple_time"] * 12
+    model["n_months"] = model["int_period"] + model["main_time"] * 12
+    model["multiple_run"] = bool(model["multiple_run"])
+    MODEL.update(model)
+    st.session_state.html_model = copy.deepcopy(model)
+
+
+def _run_html_model():
+    """Run baseline and intervention models for the HTML/JS interface."""
+    n_runs = MODEL["n_runs"] if MODEL["multiple_run"] else 1
+    n_months = MODEL["n_months"]
+    int_period = MODEL["int_period"]
+    seeds = make_shifted_run_seeds(n_runs, n_months)
+    baseline_frames, intervention_frames = [], []
+    baseline_individual, intervention_individual = [], []
+
+    for run_index in range(n_runs):
+        monthly_seeds = seeds[run_index]
+        parameter_seed = int(monthly_seeds[0])
+
+        b_param = calculate_derived_parameters(
+            get_parameters(rng=np.random.default_rng(parameter_seed), county=selected_county)
+        )
+        b_flags = reset_flags()
+        b_param.update({
+            "E": reset_E(),
+            "S": reset_S(slider_params),
+            "HSS": reset_HSS(slider_params),
+        })
+        b_df, b_ind, _ = run_model_dash(
+            b_param, b_flags, n_months, int_period, base_seed=monthly_seeds
+        )
+
+        i_param = calculate_derived_parameters(
+            get_parameters(rng=np.random.default_rng(parameter_seed), county=selected_county)
+        )
+        i_param.update({"E": copy.deepcopy(i_E), "S": copy.deepcopy(i_S), "HSS": copy.deepcopy(i_HSS)})
+        sync_param_momish_from_hss(i_param, i_HSS, i_flags)
+        i_df, i_ind, _ = run_model_dash(
+            i_param, copy.deepcopy(i_flags), n_months, int_period, base_seed=monthly_seeds
+        )
+
+        for frame, label in ((b_df, "Baseline"), (b_ind, "Baseline"), (i_df, "Intervention"), (i_ind, "Intervention")):
+            frame["Run"] = run_index + 1
+            frame["Scenario"] = label
+        baseline_frames.append(b_df)
+        baseline_individual.append(b_ind)
+        intervention_frames.append(i_df)
+        intervention_individual.append(i_ind)
+
+    baseline = pd.concat(baseline_frames, ignore_index=True)
+    intervention = pd.concat(intervention_frames, ignore_index=True)
+    baseline_people = pd.concat(baseline_individual, ignore_index=True)
+    intervention_people = pd.concat(intervention_individual, ignore_index=True)
+    result = {
+        "county": selected_county,
+        "nRuns": n_runs,
+        "nMonths": n_months,
+        "baseline": _frame_for_html(baseline),
+        "intervention": _frame_for_html(intervention),
+        "baselineIndividual": _frame_for_html(baseline_people),
+        "interventionIndividual": _frame_for_html(intervention_people),
+    }
+
+    output_dir = Path(__file__).resolve().parent / "outputs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    output_path = output_dir / f"sdr_results_{timestamp}.json"
+    file_payload = {
+        "metadata": {
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "county": selected_county,
+            "nRuns": n_runs,
+            "nMonths": n_months,
+            "configuration": _html_ui_state(),
+        },
+        "baseline": json.loads(baseline.to_json(orient="records", date_format="iso")),
+        "intervention": json.loads(intervention.to_json(orient="records", date_format="iso")),
+        "baselineIndividual": json.loads(baseline_people.to_json(orient="records", date_format="iso")),
+        "interventionIndividual": json.loads(intervention_people.to_json(orient="records", date_format="iso")),
+    }
+    output_path.write_text(json.dumps(file_payload, indent=2), encoding="utf-8")
+    result["savedFile"] = str(output_path)
+    return result
+
+
+PRIMITIVE_HTML_UI = r"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SDR model</title>
+  <style>
+    body { margin:0; padding:12px; color:#111; background:#eee; font:14px Arial,sans-serif; }
+    h1 { margin:0 0 4px; font-size:24px; } h2 { margin:16px 0 8px; font-size:18px; }
+    fieldset { margin:10px 0; padding:10px; border:1px solid #777; background:#fff; }
+    legend { font-weight:bold; } .field { display:grid; grid-template-columns:260px minmax(120px,300px); gap:8px; align-items:center; margin:5px 0; }
+    label { overflow-wrap:anywhere; } input,select,textarea,button { box-sizing:border-box; padding:5px; border:1px solid #555; border-radius:0; font:inherit; }
+    input:not([type=checkbox]),select,textarea { width:100%; } input[type=checkbox] { width:18px; height:18px; }
+    textarea { height:58px; font-family:monospace; } button { margin:4px 6px 4px 0; background:#ddd; cursor:pointer; }
+    button.primary { color:white; background:#174f3f; } button:disabled { opacity:.5; cursor:wait; }
+    #message { padding:8px; border:1px solid #888; background:#ffffdf; white-space:pre-wrap; }
+    pre { max-height:420px; overflow:auto; padding:8px; border:1px solid #888; background:#fff; font-size:11px; }
+    .note { color:#444; } @media(max-width:650px) { .field { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <h1>SDR model frontend</h1>
+  <div class="note">Primitive HTML/JavaScript test interface</div>
+  <div id="app">Waiting for Streamlit...</div>
+  <script>
+    let bootstrap = null;
+    let config = null;
+    const app = document.getElementById("app");
+    const clone = value => JSON.parse(JSON.stringify(value));
+    const esc = value => String(value).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    const send = value => parent.postMessage({isStreamlitMessage:true,type:"streamlit:setComponentValue",value}, "*");
+    const resize = () => parent.postMessage({isStreamlitMessage:true,type:"streamlit:setFrameHeight",height:document.documentElement.scrollHeight}, "*");
+    const event = (type, includeConfig=true) => send({eventId:(crypto.randomUUID ? crypto.randomUUID() : Date.now()+"-"+Math.random()),type,...(includeConfig ? {config} : {})});
+    const getAt = path => path.reduce((node,key) => node[key], config);
+    const setAt = (path,value) => { let node=config; path.slice(0,-1).forEach(key => node=node[key]); node[path.at(-1)]=value; };
+
+    function inputFor(path, value) {
+      const encoded=esc(JSON.stringify(path));
+      if (typeof value === "boolean") return `<input data-path='${encoded}' type="checkbox" ${value?"checked":""}>`;
+      if (typeof value === "number") return `<input data-path='${encoded}' type="number" step="any" value="${value}">`;
+      if (typeof value === "string") return `<input data-path='${encoded}' type="text" value="${esc(value)}">`;
+      return `<textarea data-path='${encoded}' data-json="1">${esc(JSON.stringify(value))}</textarea>`;
+    }
+    function fields(title, object) {
+      let html=`<fieldset><legend>${esc(title)}</legend>`;
+      Object.entries(object || {}).forEach(([key,value]) => html += `<div class="field"><label>${esc(key)}</label>${inputFor([title,key],value)}</div>`);
+      return html+"</fieldset>";
+    }
+    function render() {
+      if (!bootstrap) return;
+      const counties=(bootstrap.countyOptions||[]).map(c=>`<option ${c===config.county?"selected":""}>${esc(c)}</option>`).join("");
+      const result=bootstrap.results;
+      const error=bootstrap.error;
+      app.innerHTML=`
+        <fieldset><legend>Location</legend><div class="field"><label>County</label><select id="county">${counties}</select></div></fieldset>
+        ${fields("model",config.model)}${fields("flags",config.flags)}${fields("E",config.E)}${fields("S",config.S)}${fields("HSS",config.HSS)}
+        <button id="apply">Apply inputs</button><button id="run" class="primary">Run model</button><button id="reset">Reset</button>
+        <h2>Status</h2><div id="message">${error ? "ERROR: "+esc(error.message) : result ? "Finished. JSON saved to: "+esc(result.savedFile) : "Ready."}</div>
+        <h2>Baseline JSON preview</h2><pre>${result ? esc(JSON.stringify(result.baseline,null,2)) : "No results yet."}</pre>
+        <h2>Intervention JSON preview</h2><pre>${result ? esc(JSON.stringify(result.intervention,null,2)) : "No results yet."}</pre>`;
+      document.getElementById("county").onchange=e => config.county=e.target.value;
+      document.querySelectorAll("[data-path]").forEach(el => el.onchange=() => {
+        const path=JSON.parse(el.dataset.path); let value;
+        try { value=el.type==="checkbox" ? el.checked : el.dataset.json ? JSON.parse(el.value) : el.type==="number" ? Number(el.value) : el.value; }
+        catch(e) { alert("Invalid JSON for "+path.join(".")); return; } setAt(path,value);
+      });
+      document.getElementById("apply").onclick=()=>event("stateChanged");
+      document.getElementById("run").onclick=e=>{ e.target.disabled=true; document.getElementById("message").textContent="Running model..."; event("runModel"); };
+      document.getElementById("reset").onclick=()=>event("reset",false);
+      resize();
+    }
+    addEventListener("message", e => { if (e.data?.type!=="streamlit:render") return; bootstrap=e.data.args.bootstrap; config=clone(bootstrap.state); render(); });
+    parent.postMessage({isStreamlitMessage:true,type:"streamlit:componentReady",apiVersion:1}, "*");
+    resize();
+  </script>
+</body></html>"""
+
+
+@st.cache_resource
+def _primitive_html_build_dir():
+    build_dir = Path(tempfile.gettempdir()) / "sdr_primitive_html_component_v1"
+    build_dir.mkdir(parents=True, exist_ok=True)
+    (build_dir / "index.html").write_text(PRIMITIVE_HTML_UI, encoding="utf-8")
+    return build_dir
+
+
+def _declare_html_component():
+    if HTML_UI_DEV_URL:
+        return components.declare_component("sdr_html_ui", url=HTML_UI_DEV_URL)
+    if HTML_UI_BUILD_DIR:
+        build_dir = Path(HTML_UI_BUILD_DIR).expanduser().resolve()
+        if not build_dir.is_dir():
+            raise FileNotFoundError(f"SDR HTML UI build directory does not exist: {build_dir}")
+    else:
+        external_frontend = Path(__file__).resolve().parent / "frontend"
+        build_dir = external_frontend if external_frontend.is_dir() else _primitive_html_build_dir()
+    return components.declare_component("sdr_html_ui", path=str(build_dir))
+
+
+def render_html_component_app():
+    """Render Ayo's frontend and process its latest event."""
+    st.markdown(
+        """
+        <style>
+        iframe[data-testid="stCustomComponentV1"] {
+            min-height: 5200px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    try:
+        component = _declare_html_component()
+    except (FileNotFoundError, ValueError) as exc:
+        st.error(str(exc))
+        st.code("SDR_HTML_UI_URL=http://localhost:3000 streamlit run SDR_Dash_TI.py")
+        return
+
+    event = component(
+        protocolVersion=HTML_UI_PROTOCOL_VERSION,
+        bootstrap=_json_safe({
+            "countyOptions": county_options,
+            "defaultCounty": DEFAULT_COUNTY,
+            "fqaPulseModifierOptions": FQA_PULSE_MODIFIER_OPTIONS,
+            "pulseImplementationBoostOptions": PULSE_IMPLEMENTATION_BOOST_OPTIONS,
+            "state": _html_ui_state(),
+            "results": st.session_state.get("html_results"),
+            "error": st.session_state.get("html_error"),
+        }),
+        key="sdr_html_ui_root",
+        default=None,
+    )
+    if not isinstance(event, dict):
+        return
+
+    event_id = event.get("eventId")
+    if not event_id or event_id == st.session_state.get("html_last_event_id"):
+        return
+    st.session_state.html_last_event_id = event_id
+
+    try:
+        action = event.get("type")
+        if action in {"stateChanged", "runModel"}:
+            _apply_html_ui_state(event.get("config", {}))
+        if action == "runModel":
+            st.session_state.html_error = None
+            st.session_state.html_results = _run_html_model()
+        elif action == "reset":
+            i_flags.clear()
+            i_flags.update(reset_flags())
+            i_E.clear()
+            i_E.update(reset_E())
+            i_S.clear()
+            i_S.update(reset_S(slider_params))
+            i_HSS.clear()
+            i_HSS.update(reset_HSS(slider_params))
+            st.session_state.html_selected_county = DEFAULT_COUNTY
+            MODEL.update({
+                "imple_time": 3,
+                "main_time": 0,
+                "int_period": 36,
+                "n_months": 36,
+                "multiple_run": False,
+                "n_runs": 1,
+            })
+            st.session_state.html_model = copy.deepcopy(MODEL)
+            st.session_state.html_results = None
+            st.session_state.html_error = None
+        elif action not in {"stateChanged", "ready"}:
+            raise ValueError(f"Unsupported component event: {action}")
+    except Exception as exc:
+        st.session_state.html_error = {"type": type(exc).__name__, "message": str(exc)}
+    st.rerun()
+
+
 # Display selected intervention type
 # Initialize session state to manage navigation
 if 'intervention_selection' not in st.session_state:
@@ -1599,9 +2043,24 @@ if 'dl_table' not in st.session_state:
     st.session_state.dl_table = None
 
 
+if HTML_UI_ENABLED:
+    render_html_component_app()
+    # In component mode the HTML/JS application owns the entire visible UI.
+    # The legacy Streamlit controls below remain available as a fallback.
+    st.stop()
+
 
 
 with st.sidebar:
+    st.markdown(
+        """
+        <div class="sdr-side-brand">
+          <strong>Scenario controls</strong>
+          <span>Build, run, and compare strategies</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     with st.expander("⚙️ **Scenario Settings** (Click to expand/collapse)", expanded=True):
         # Leading Question
         if st.session_state.intervention_selection is None:
