@@ -1719,6 +1719,65 @@ def _frame_for_html(frame):
     }
 
 
+def _frame_for_json_file(frame):
+    """Encode a small, aggregated dataframe as readable named-column records."""
+    if frame is None:
+        return None
+    return {
+        "rowCount": int(len(frame)),
+        "rows": json.loads(
+            frame.to_json(orient="records", date_format="iso")
+        ),
+    }
+
+
+def _aggregate_mortality_death_causes(individual_frame):
+    """Reduce individual outcomes to non-identifying death-cause statistics."""
+    per_run_columns = ["Run", "Scenario", "death_cause", "count"]
+    summary_columns = [
+        "Scenario",
+        "death_cause",
+        "totalCount",
+        "meanCountPerRun",
+        "proportionOfDeaths",
+    ]
+    required = {"Run", "Scenario", "death_cause"}
+    if individual_frame is None or not required.issubset(individual_frame.columns):
+        return pd.DataFrame(columns=per_run_columns), pd.DataFrame(columns=summary_columns)
+
+    deaths = individual_frame.loc[
+        individual_frame["death_cause"].notna()
+        & individual_frame["death_cause"].ne("none"),
+        ["Run", "Scenario", "death_cause"],
+    ]
+    if deaths.empty:
+        return pd.DataFrame(columns=per_run_columns), pd.DataFrame(columns=summary_columns)
+
+    per_run = (
+        deaths.groupby(["Run", "Scenario", "death_cause"], as_index=False)
+        .size()
+        .rename(columns={"size": "count"})
+    )
+    summary = (
+        per_run.groupby(["Scenario", "death_cause"], as_index=False)["count"]
+        .sum()
+        .rename(columns={"count": "totalCount"})
+    )
+    run_counts = individual_frame.groupby("Scenario")["Run"].nunique().clip(lower=1)
+    summary["meanCountPerRun"] = summary.apply(
+        lambda row: row["totalCount"] / run_counts.get(row["Scenario"], 1),
+        axis=1,
+    )
+    scenario_totals = summary.groupby("Scenario")["totalCount"].transform("sum")
+    summary["proportionOfDeaths"] = np.divide(
+        summary["totalCount"],
+        scenario_totals,
+        out=np.zeros(len(summary), dtype=float),
+        where=scenario_totals.to_numpy() != 0,
+    )
+    return per_run[per_run_columns], summary[summary_columns]
+
+
 def _html_ui_state():
     return _json_safe({
         "county": st.session_state.get("html_selected_county", DEFAULT_COUNTY),
@@ -1833,14 +1892,31 @@ def _run_html_model():
     intervention = pd.concat(intervention_frames, ignore_index=True)
     baseline_people = pd.concat(baseline_individual, ignore_index=True)
     intervention_people = pd.concat(intervention_individual, ignore_index=True)
+    baseline_deaths_per_run, baseline_deaths_summary = _aggregate_mortality_death_causes(
+        baseline_people
+    )
+    intervention_deaths_per_run, intervention_deaths_summary = _aggregate_mortality_death_causes(
+        intervention_people
+    )
+    death_causes_per_run = pd.concat(
+        [baseline_deaths_per_run, intervention_deaths_per_run], ignore_index=True
+    )
+    death_causes_summary = pd.concat(
+        [baseline_deaths_summary, intervention_deaths_summary], ignore_index=True
+    )
+    # Individual records are no longer needed after aggregation and must not be
+    # included in either the browser payload or saved JSON.
+    del baseline_people, intervention_people
     result = {
         "county": selected_county,
         "nRuns": n_runs,
         "nMonths": n_months,
         "baseline": _frame_for_html(baseline),
         "intervention": _frame_for_html(intervention),
-        "baselineIndividual": _frame_for_html(baseline_people),
-        "interventionIndividual": _frame_for_html(intervention_people),
+        "mortalityDeathCauses": {
+            "perRun": _frame_for_html(death_causes_per_run),
+            "summary": _frame_for_html(death_causes_summary),
+        },
     }
 
     output_dir = Path(__file__).resolve().parent / "outputs"
@@ -1849,18 +1925,25 @@ def _run_html_model():
     output_path = output_dir / f"sdr_results_{timestamp}.json"
     file_payload = {
         "metadata": {
+            "formatVersion": 3,
+            "tableEncoding": "named-column-records",
             "createdAt": datetime.now(timezone.utc).isoformat(),
             "county": selected_county,
             "nRuns": n_runs,
             "nMonths": n_months,
             "configuration": _html_ui_state(),
         },
-        "baseline": json.loads(baseline.to_json(orient="records", date_format="iso")),
-        "intervention": json.loads(intervention.to_json(orient="records", date_format="iso")),
-        "baselineIndividual": json.loads(baseline_people.to_json(orient="records", date_format="iso")),
-        "interventionIndividual": json.loads(intervention_people.to_json(orient="records", date_format="iso")),
+        "baseline": _frame_for_json_file(baseline),
+        "intervention": _frame_for_json_file(intervention),
+        "mortalityDeathCauses": {
+            "perRun": _frame_for_json_file(death_causes_per_run),
+            "summary": _frame_for_json_file(death_causes_summary),
+        },
     }
-    output_path.write_text(json.dumps(file_payload, indent=2), encoding="utf-8")
+    output_path.write_text(
+        json.dumps(file_payload, separators=(",", ":")),
+        encoding="utf-8",
+    )
     result["savedFile"] = str(output_path)
     return result
 
