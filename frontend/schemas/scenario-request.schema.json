@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sdr.local/schemas/scenario-request.schema.json",
+  "title": "SDR scenario request",
+  "description": "A request to run one to three ordered scenarios with shared simulation settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "createdAt",
+    "sharedSettings",
+    "outputSelection",
+    "referenceScenarioId",
+    "scenarios"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sharedSettings": {
+      "$ref": "#/$defs/sharedSettings"
+    },
+    "outputSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "const": "all_outcomes"
+        }
+      }
+    },
+    "referenceScenarioId": {
+      "type": "string",
+      "description": "The scenario selected by the user as the reference for comparison plots. The backend must verify that this ID exists in scenarios."
+    },
+    "scenarios": {
+      "type": "array",
+      "description": "Scenario order controls display order. The frontend creates the first scenario automatically with editable planning inputs, but referenceScenarioId explicitly identifies the comparison reference.",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/scenario"
+      }
+    }
+  },
+  "$defs": {
+    "sharedSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "countyId",
+        "numberOfRuns",
+        "numberOfMonths",
+        "randomSeedStrategy",
+        "confidenceIntervalMethod"
+      ],
+      "properties": {
+        "countyId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "numberOfRuns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "numberOfMonths": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "randomSeedStrategy": {
+          "const": "matched_across_scenarios"
+        },
+        "randomSeed": {
+          "type": ["integer", "null"]
+        },
+        "confidenceIntervalMethod": {
+          "enum": [
+            "mean_per_run_poisson_bounds",
+            "empirical_run_quantiles"
+          ]
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenarioId",
+        "revision",
+        "label",
+        "scenarioRole",
+        "planningInputs"
+      ],
+      "properties": {
+        "scenarioId": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "scenarioRole": {
+          "enum": ["reference", "comparison"]
+        },
+        "planningInputs": {
+          "type": "object",
+          "description": "Editable, user-facing scenario inputs. Parameter definitions and validation rules are supplied separately by the application bootstrap contract.",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

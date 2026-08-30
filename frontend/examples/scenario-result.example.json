@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "resultId": "result_20260828_001",
+  "requestId": "req_20260828_001",
+  "completedAt": "2026-08-28T18:35:00Z",
+  "status": "completed",
+  "modelVersion": "sdr-2026.08",
+  "sharedSettings": {
+    "countyId": "county_z",
+    "numberOfRuns": 10,
+    "numberOfMonths": 36,
+    "randomSeedStrategy": "matched_across_scenarios",
+    "randomSeed": 4281,
+    "confidenceIntervalMethod": "mean_per_run_poisson_bounds"
+  },
+  "outputSelection": {
+    "mode": "all_outcomes"
+  },
+  "referenceScenarioId": "baseline",
+  "scenarios": [
+    {
+      "scenarioId": "baseline",
+      "revision": 1,
+      "label": "Baseline",
+      "description": "Automatically created reference scenario with editable planning inputs.",
+      "scenarioRole": "reference",
+      "planningInputs": {
+        "additionalCHAs": 0
+      },
+      "resolvedModelInputs": {
+        "flags": {},
+        "E": {},
+        "S": {},
+        "HSS": {},
+        "model": {}
+      },
+      "datasets": [
+        {
+          "datasetId": "monthlyMmrByLevel",
+          "label": "Monthly MMR by delivery level",
+          "rowCount": 1,
+          "columns": ["month", "levelId", "mmr", "lower95", "upper95"],
+          "rows": [
+            {
+              "month": 1,
+              "levelId": "all",
+              "mmr": 302.4,
+              "lower95": 278.1,
+              "upper95": 328.9
+            }
+          ],
+          "metadata": {
+            "confidenceIntervalMethod": "mean_per_run_poisson_bounds"
+          }
+        }
+      ]
+    },
+    {
+      "scenarioId": "intervention_a",
+      "revision": 1,
+      "label": "Intervention A",
+      "description": "Adds 1,000 community health assistants.",
+      "scenarioRole": "comparison",
+      "planningInputs": {
+        "additionalCHAs": 1000
+      },
+      "resolvedModelInputs": {
+        "flags": {},
+        "E": {},
+        "S": {},
+        "HSS": {},
+        "model": {}
+      },
+      "datasets": [
+        {
+          "datasetId": "monthlyMmrByLevel",
+          "label": "Monthly MMR by delivery level",
+          "rowCount": 1,
+          "columns": ["month", "levelId", "mmr", "lower95", "upper95"],
+          "rows": [
+            {
+              "month": 1,
+              "levelId": "all",
+              "mmr": 281.3,
+              "lower95": 258.7,
+              "upper95": 305.8
+            }
+          ],
+          "metadata": {
+            "confidenceIntervalMethod": "mean_per_run_poisson_bounds"
+          }
+        }
+      ]
+    }
+  ]
+}

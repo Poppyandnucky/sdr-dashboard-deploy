@@ -1,0 +1,269 @@
+{
+  "schemaVersion": 1,
+  "catalogId": "sdr-plot-catalog",
+  "status": "draft",
+  "frontendBehavior": {
+    "chartLibrary": "plotly.js",
+    "outcomeSelectionMode": "render_all_plots_for_selected_outcome",
+    "allowLevelSelection": false,
+    "orderingSource": "catalog_array_order",
+    "displayTextSource": "plot_catalog"
+  },
+  "outcomeCategories": [
+    {
+      "outcomeCategoryId": "system_features",
+      "outcomeCategoryLabel": "System Features",
+      "outcomes": [
+        { "outcomeId": "facility_capacity_ratio", "outcomeLabel": "Facility capacity ratio" },
+        { "outcomeId": "labor_force_ratio", "outcomeLabel": "Labor force ratio" },
+        { "outcomeId": "equipment_inventory_ratio", "outcomeLabel": "Equipment inventory ratio" }
+      ]
+    },
+    {
+      "outcomeCategoryId": "process_indicators",
+      "outcomeCategoryLabel": "Process Indicators",
+      "outcomes": [
+        { "outcomeId": "distribution_of_live_births", "outcomeLabel": "Distribution of live births" },
+        { "outcomeId": "high_risk_pregnancies", "outcomeLabel": "High-risk pregnancies" },
+        { "outcomeId": "anc_rate", "outcomeLabel": "ANC rate" },
+        { "outcomeId": "c_section_rate", "outcomeLabel": "C-section rate" },
+        { "outcomeId": "normal_referral", "outcomeLabel": "Normal referral" },
+        { "outcomeId": "emergency_transfer", "outcomeLabel": "Emergency transfer" }
+      ]
+    },
+    {
+      "outcomeCategoryId": "implementation_outcomes",
+      "outcomeCategoryLabel": "Implementation Outcomes",
+      "outcomes": [
+        { "outcomeId": "cost_effectiveness", "outcomeLabel": "Cost Effectiveness" },
+        { "outcomeId": "dalys", "outcomeLabel": "DALYs" },
+        { "outcomeId": "dalys_averted", "outcomeLabel": "DALYs averted" }
+      ]
+    },
+    {
+      "outcomeCategoryId": "maternal_outcomes",
+      "outcomeCategoryLabel": "Maternal Outcomes",
+      "outcomes": [
+        { "outcomeId": "maternal_complication_rate", "outcomeLabel": "Maternal complication rate" },
+        { "outcomeId": "severe_maternal_outcomes", "outcomeLabel": "Severe maternal outcomes" },
+        { "outcomeId": "maternal_mortality", "outcomeLabel": "Maternal mortality ratio" }
+      ]
+    },
+    {
+      "outcomeCategoryId": "neonatal_outcomes",
+      "outcomeCategoryLabel": "Neonatal Outcomes",
+      "outcomes": [
+        { "outcomeId": "preterm_rate", "outcomeLabel": "Preterm rate" },
+        { "outcomeId": "neonatal_complication_rate", "outcomeLabel": "Neonatal complication rate" },
+        { "outcomeId": "neonatal_mortality_rate", "outcomeLabel": "Neonatal mortality rate" },
+        { "outcomeId": "stillbirth_rate", "outcomeLabel": "Stillbirth rate" }
+      ]
+    }
+  ],
+  "plots": [
+    {
+      "plotId": "maternal_mortality_ratio_by_month_and_level",
+      "outcomeCategoryId": "maternal_outcomes",
+      "outcomeCategoryLabel": "Maternal Outcomes",
+      "outcomeId": "maternal_mortality",
+      "outcomeLabel": "Maternal mortality ratio",
+      "plotLabel": "MMR by month",
+      "description": "Monthly maternal deaths per 100,000 live births by delivery level.",
+      "chartType": "lineWithConfidenceInterval",
+      "datasetId": "monthlyMmrByLevel",
+      "x": {
+        "field": "month",
+        "type": "integer",
+        "label": "Time since the start of intervention implementation (months)"
+      },
+      "y": {
+        "field": "mmr",
+        "type": "number",
+        "label": "MMR (deaths per 100,000 live births)",
+        "unit": "deaths_per_100000_live_births",
+        "scale": { "minimum": 0, "maximum": "dataUpper95Maximum" }
+      },
+      "confidenceInterval": {
+        "lowerField": "lower95",
+        "upperField": "upper95",
+        "level": 0.95,
+        "label": "95% confidence interval",
+        "defaultMethod": "mean_per_run_poisson_bounds",
+        "supportedMethods": [
+          {
+            "methodId": "mean_per_run_poisson_bounds",
+            "methodLabel": "Mean of per-run Poisson interval bounds"
+          },
+          {
+            "methodId": "empirical_run_quantiles",
+            "methodLabel": "Empirical quantiles across simulation runs"
+          }
+        ]
+      },
+      "series": {
+        "field": "levelId",
+        "label": "Level",
+        "values": [
+          { "id": "l23", "label": "L2/3" },
+          { "id": "l4", "label": "L4" },
+          { "id": "l5", "label": "L5" }
+        ]
+      },
+      "display": {
+        "title": "MMR by month",
+        "legendTitle": "Level",
+        "showGrid": true,
+        "allowLevelSelection": false,
+        "scenarioSelectionMode": "single"
+      },
+      "dataRules": {
+        "zeroDenominatorValue": null
+      }
+    },
+    {
+      "plotId": "maternal_mortality_ratio_period_summary_by_level",
+      "outcomeCategoryId": "maternal_outcomes",
+      "outcomeCategoryLabel": "Maternal Outcomes",
+      "outcomeId": "maternal_mortality",
+      "outcomeLabel": "Maternal mortality ratio",
+      "plotLabel": "MMR period summary",
+      "description": "Scenario comparison of maternal deaths per 100,000 live births, faceted by delivery level.",
+      "chartType": "barWithConfidenceInterval",
+      "datasetId": "periodMmrByLevel",
+      "x": {
+        "field": "scenarioId",
+        "type": "nominal",
+        "label": "Scenario"
+      },
+      "y": {
+        "field": "mmr",
+        "type": "number",
+        "label": "MMR (deaths per 100,000 live births)",
+        "unit": "deaths_per_100000_live_births",
+        "scale": { "minimum": 0, "maximum": "dataUpper95Maximum" }
+      },
+      "confidenceInterval": {
+        "lowerField": "lower95",
+        "upperField": "upper95",
+        "level": 0.95,
+        "label": "95% confidence interval",
+        "defaultMethod": "mean_per_run_poisson_bounds",
+        "supportedMethods": [
+          {
+            "methodId": "mean_per_run_poisson_bounds",
+            "methodLabel": "Mean of per-run Poisson interval bounds"
+          },
+          {
+            "methodId": "empirical_run_quantiles",
+            "methodLabel": "Empirical quantiles across simulation runs"
+          }
+        ]
+      },
+      "facet": {
+        "field": "levelId",
+        "label": "Delivery Location"
+      },
+      "display": {
+        "title": "Average Ratio Over Full Simulation Period",
+        "legendTitle": "Scenario"
+      },
+      "aggregationPeriod": {
+        "method": "full_simulation",
+        "label": "Full simulation period",
+        "status": "confirmed"
+      },
+      "aggregation": {
+        "withinRun": "Sum maternal deaths and live births over all simulation months, then calculate deaths divided by live births times 100000.",
+        "acrossRuns": "Arithmetic mean of the full-period MMR calculated separately for each simulation run."
+      },
+      "dataRules": {
+        "zeroDenominatorValue": null
+      }
+    },
+    {
+      "plotId": "maternal_death_cause_distribution_by_scenario",
+      "outcomeCategoryId": "maternal_outcomes",
+      "outcomeCategoryLabel": "Maternal Outcomes",
+      "outcomeId": "maternal_mortality",
+      "outcomeLabel": "Maternal mortality ratio",
+      "plotLabel": "Distribution of causes",
+      "description": "Proportion of attributed maternal deaths in each cause category by scenario.",
+      "chartType": "normalizedStackedBar",
+      "datasetId": "maternalDeathsByCause",
+      "x": {
+        "field": "scenarioId",
+        "type": "nominal",
+        "label": "Scenario"
+      },
+      "y": {
+        "field": "proportionOfAttributedDeaths",
+        "type": "number",
+        "label": "Proportion of deaths",
+        "unit": "proportion",
+        "scale": { "minimum": 0, "maximum": 1 }
+      },
+      "series": {
+        "field": "deathCauseId",
+        "label": "Cause of Death",
+        "values": [
+          { "id": "pph", "label": "Postpartum hemorrhage" },
+          { "id": "sepsis", "label": "Sepsis" },
+          { "id": "eclampsia", "label": "Eclampsia" },
+          { "id": "ol", "label": "Obstructed labor" },
+          { "id": "aph", "label": "Antepartum hemorrhage" },
+          { "id": "other", "label": "Other" }
+        ]
+      },
+      "aggregation": {
+        "method": "pooled_across_runs",
+        "denominator": "All attributed maternal deaths pooled across simulation runs for the same scenario"
+      },
+      "display": {
+        "title": "Proportion of Maternal Death Causes by Scenario",
+        "legendTitle": "Cause of Death"
+      }
+    },
+    {
+      "plotId": "maternal_deaths_by_cause_scenario_comparison",
+      "outcomeCategoryId": "maternal_outcomes",
+      "outcomeCategoryLabel": "Maternal Outcomes",
+      "outcomeId": "maternal_mortality",
+      "outcomeLabel": "Maternal mortality ratio",
+      "plotLabel": "Deaths by cause",
+      "description": "Mean maternal death count by cause for a reference scenario and the change to a comparison scenario.",
+      "chartType": "referencePlusDeltaBar",
+      "datasetId": "maternalDeathsByCause",
+      "x": {
+        "field": "deathCauseId",
+        "type": "nominal",
+        "label": "Cause of death"
+      },
+      "y": {
+        "field": "meanCountPerRun",
+        "type": "number",
+        "label": "Maternal deaths (mean count)",
+        "unit": "deaths"
+      },
+      "comparison": {
+        "referenceScenarioField": "referenceScenarioId",
+        "comparisonScenarioField": "comparisonScenarioId",
+        "deltaField": "absoluteChange",
+        "percentChangeField": "percentChange",
+        "defaultReferenceScenario": "explicit_user_selection",
+        "fallbackReferenceScenario": "first_scenario"
+      },
+      "categories": [
+        { "id": "pph", "label": "Postpartum hemorrhage" },
+        { "id": "sepsis", "label": "Sepsis" },
+        { "id": "eclampsia", "label": "Eclampsia" },
+        { "id": "ol", "label": "Obstructed labor" },
+        { "id": "aph", "label": "Antepartum hemorrhage" },
+        { "id": "other", "label": "Other" }
+      ],
+      "display": {
+        "titleTemplate": "Maternal deaths by cause: {referenceScenarioLabel} with change to {comparisonScenarioLabel}",
+        "legendTitle": "Component"
+      }
+    }
+  ]
+}

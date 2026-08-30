@@ -1,0 +1,483 @@
+{
+  "schemaVersion": 1,
+  "catalogId": "sdr-control-catalog",
+  "status": "draft",
+  "notes": {
+    "labelsEditable": true,
+    "modelMappingsStatus": "pending",
+    "unitsStatus": "pending",
+    "defaultsStatus": "pending_or_county_dependent",
+    "percentageInputConvention": "Frontend values are whole percentages from 0 to 100 unless a control specifies another range. The resolver converts them to the model's required representation."
+  },
+  "actions": [
+    {
+      "actionId": "run_model",
+      "label": "Run model",
+      "actionType": "submit"
+    },
+    {
+      "actionId": "clear_selections",
+      "label": "Clear selections",
+      "actionType": "reset_form"
+    },
+    {
+      "actionId": "clear_cached_model_results",
+      "label": "Clear cached model results",
+      "actionType": "clear_results"
+    }
+  ],
+  "controlTypes": {
+    "toggle": { "valueType": "boolean" },
+    "percentageSlider": { "valueType": "integer", "minimum": 0, "maximum": 100, "step": 1 },
+    "integerSlider": { "valueType": "integer", "step": 1 },
+    "select": { "valueType": "string" },
+    "radio": { "valueType": "string" }
+  },
+  "controlGroups": [
+    {
+      "controlGroupId": "geography",
+      "controlGroupLabel": "County Selection",
+      "scope": "request",
+      "controls": [
+        {
+          "parameterId": "county_id",
+          "label": "County",
+          "controlType": "select",
+          "choicesSource": "countyDefaultsByCounty"
+        }
+      ]
+    },
+    {
+      "controlGroupId": "treatment_interventions",
+      "controlGroupLabel": "Treatment interventions (Drugs and Supplies)",
+      "controls": [
+        {
+          "parameterId": "pph_bundle_enabled",
+          "label": "PPH bundle",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "pph_bundle_coverage",
+          "label": "PPH bundle coverage",
+          "definition": "% mothers with PPH in L4/5 supplied",
+          "controlType": "percentageSlider",
+          "enabledWhen": { "parameterId": "pph_bundle_enabled", "equals": true }
+        },
+        {
+          "parameterId": "magnesium_sulfate_enabled",
+          "label": "Magnesium sulfate (MgSO4)",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "magnesium_sulfate_coverage",
+          "label": "Magnesium sulfate (MgSO4) coverage",
+          "definition": "% mothers with eclampsia in L4/5 supplied",
+          "controlType": "percentageSlider",
+          "enabledWhen": { "parameterId": "magnesium_sulfate_enabled", "equals": true }
+        },
+        {
+          "parameterId": "maternal_sepsis_antibiotics_enabled",
+          "label": "Antibiotics for maternal sepsis",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "maternal_sepsis_antibiotics_coverage",
+          "label": "Antibiotics for maternal sepsis coverage",
+          "definition": "% mothers with sepsis in L4/5 supplied",
+          "controlType": "percentageSlider",
+          "enabledWhen": { "parameterId": "maternal_sepsis_antibiotics_enabled", "equals": true }
+        },
+        {
+          "parameterId": "iv_iron_enabled",
+          "label": "IV iron infusion",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "iv_iron_coverage",
+          "label": "IV iron infusion coverage",
+          "definition": "% mothers with severe anemia supplied",
+          "controlType": "percentageSlider",
+          "enabledWhen": { "parameterId": "iv_iron_enabled", "equals": true }
+        },
+        {
+          "parameterId": "prolonged_labor_oxytocin_enabled",
+          "label": "Oxytocin for prolonged labor",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "prolonged_labor_oxytocin_coverage",
+          "label": "Oxytocin for prolonged labor coverage",
+          "definition": "% prolonged labor in L4/5 supplied",
+          "controlType": "percentageSlider",
+          "enabledWhen": { "parameterId": "prolonged_labor_oxytocin_enabled", "equals": true }
+        },
+        {
+          "parameterId": "ai_ultrasound_enabled",
+          "label": "AI portable ultrasound (AI-US)",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "ai_ultrasound_sensitivity",
+          "label": "Sensitivity of AI-US",
+          "controlType": "percentageSlider",
+          "enabledWhen": { "parameterId": "ai_ultrasound_enabled", "equals": true }
+        },
+        {
+          "parameterId": "ai_ultrasound_specificity",
+          "label": "Specificity of AI-US",
+          "controlType": "percentageSlider",
+          "enabledWhen": { "parameterId": "ai_ultrasound_enabled", "equals": true }
+        },
+        {
+          "parameterId": "intrapartum_sensors_enabled",
+          "label": "Intrapartum sensors",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "sensor_ai_algorithms_enabled",
+          "label": "Apply AI algorithms",
+          "controlType": "toggle",
+          "enabledWhen": { "parameterId": "intrapartum_sensors_enabled", "equals": true }
+        },
+        {
+          "parameterId": "ai_sensor_sensitivity",
+          "label": "Sensitivity of AI-sensor",
+          "controlType": "percentageSlider",
+          "enabledWhen": { "parameterId": "sensor_ai_algorithms_enabled", "equals": true }
+        },
+        {
+          "parameterId": "ai_sensor_specificity",
+          "label": "Specificity of AI-sensor",
+          "controlType": "percentageSlider",
+          "enabledWhen": { "parameterId": "sensor_ai_algorithms_enabled", "equals": true }
+        }
+      ]
+    },
+    {
+      "controlGroupId": "model_settings",
+      "controlGroupLabel": "Model Settings",
+      "controls": [
+        {
+          "parameterId": "implementation_phase_years",
+          "label": "The length of implementation phase (years)?",
+          "controlType": "integerSlider",
+          "constraints": { "minimum": 3, "maximum": 6, "step": 1 }
+        },
+        {
+          "parameterId": "maintenance_phase_years",
+          "label": "The length of maintenance phase (years)?",
+          "controlType": "integerSlider",
+          "constraints": { "minimum": 0, "maximum": 3, "step": 1 }
+        },
+        {
+          "parameterId": "multiple_run_enabled",
+          "label": "Run model multiple times",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "number_of_runs",
+          "label": "Number of model runs",
+          "controlType": "integerSlider",
+          "constraints": { "minimum": 1, "maximum": 300, "step": 1 },
+          "enabledWhen": { "parameterId": "multiple_run_enabled", "equals": true }
+        }
+      ]
+    },
+    {
+      "controlGroupId": "momish_interventions",
+      "controlGroupLabel": "MOMISH Interventions",
+      "controls": [
+        {
+          "parameterId": "overall_facility_delivery",
+          "label": "Overall facility delivery",
+          "definition": "HSS demand/supply context for PROMPTS and MENTORS",
+          "controlType": "radio",
+          "choices": [
+            { "value": "off", "label": "Not enabled (no HSS)" },
+            { "value": "low", "label": "Low — Conservative preset" },
+            { "value": "high", "label": "High — Aggressive preset" }
+          ]
+        },
+        {
+          "parameterId": "prompts_enabled",
+          "label": "Enable PROMPTS",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "prompts_implementation_level",
+          "label": "PROMPTS implementation level",
+          "controlType": "select",
+          "choices": [
+            { "value": "current", "label": "Current" },
+            { "value": "moderate", "label": "Moderate" },
+            { "value": "high", "label": "High" }
+          ],
+          "enabledWhen": { "parameterId": "prompts_enabled", "equals": true }
+        },
+        {
+          "parameterId": "mentors_enabled",
+          "label": "MENTORS intervention",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "mentors_implementation_level",
+          "label": "MENTORS implementation level",
+          "controlType": "select",
+          "choices": [
+            { "value": "current", "label": "Current" },
+            { "value": "moderate", "label": "Moderate" },
+            { "value": "high", "label": "High" }
+          ],
+          "enabledWhen": { "parameterId": "mentors_enabled", "equals": true }
+        },
+        {
+          "parameterId": "pulse_enabled",
+          "label": "PULSE intervention",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "pulse_implementation_level",
+          "label": "PULSE implementation level",
+          "controlType": "select",
+          "choices": [
+            { "value": "current", "label": "Current" },
+            { "value": "moderate", "label": "Moderate" },
+            { "value": "high", "label": "High" }
+          ],
+          "enabledWhen": { "parameterId": "pulse_enabled", "equals": true }
+        },
+        {
+          "parameterId": "pulse_implementation_boost_level",
+          "label": "PULSE implementation boost to other MOMISH interventions",
+          "controlType": "select",
+          "choices": [
+            { "value": "current", "label": "Current" },
+            { "value": "moderate", "label": "Moderate" },
+            { "value": "high", "label": "High" }
+          ],
+          "enabledWhen": { "parameterId": "pulse_enabled", "equals": true }
+        },
+        {
+          "parameterId": "fqa_enabled",
+          "label": "FQA intervention",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "fqa_implementation_level",
+          "label": "FQA implementation level",
+          "controlType": "select",
+          "choices": [
+            { "value": "current", "label": "Current" },
+            { "value": "moderate", "label": "Moderate" },
+            { "value": "high", "label": "High" }
+          ],
+          "enabledWhen": { "parameterId": "fqa_enabled", "equals": true }
+        },
+        {
+          "parameterId": "fqa_pulse_amplification_level",
+          "label": "FQA amplification of PULSE effect",
+          "helpText": "This setting has an effect only when at least one MOMISH intervention is selected.",
+          "controlType": "select",
+          "choices": [
+            { "value": "low", "label": "Low" },
+            { "value": "medium", "label": "Medium" },
+            { "value": "high", "label": "High" }
+          ],
+          "enabledWhen": { "parameterId": "fqa_enabled", "equals": true }
+        },
+        {
+          "parameterId": "blood_intervention_enabled",
+          "label": "Blood intervention",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "blood_tracking_implementation_level",
+          "label": "Blood tracking implementation level",
+          "controlType": "select",
+          "choices": [
+            { "value": "current", "label": "Current" },
+            { "value": "moderate", "label": "Moderate" },
+            { "value": "high", "label": "High" }
+          ],
+          "enabledWhen": { "parameterId": "blood_intervention_enabled", "equals": true }
+        },
+        {
+          "parameterId": "transfer_emt_enabled",
+          "label": "Transfer & EMT implementation",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "transfer_emt_implementation_level",
+          "label": "Transfer & EMT implementation level",
+          "controlType": "select",
+          "choices": [
+            { "value": "current", "label": "Current" },
+            { "value": "moderate", "label": "Moderate" },
+            { "value": "high", "label": "High" }
+          ],
+          "enabledWhen": { "parameterId": "transfer_emt_enabled", "equals": true }
+        }
+      ]
+    },
+    {
+      "controlGroupId": "hss_demand",
+      "controlGroupLabel": "HSS interventions (Demand)",
+      "controls": [
+        {
+          "parameterId": "employ_chvs",
+          "label": "Employ CHVs",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "increase_anc_visits_enabled",
+          "label": "Increasing 4+ANC visits",
+          "controlType": "toggle",
+          "enabledWhen": { "parameterId": "employ_chvs", "equals": true }
+        },
+        {
+          "parameterId": "expected_anc_rate",
+          "label": "Expected 4+ANC rate",
+          "controlType": "percentageSlider",
+          "constraints": {
+            "minimumSource": "selected_county_baseline_anc_rate",
+            "maximum": 100,
+            "step": 2
+          },
+          "enabledWhen": { "parameterId": "increase_anc_visits_enabled", "equals": true }
+        },
+        {
+          "parameterId": "increase_l45_live_births_enabled",
+          "label": "Increasing live births in L4/5 facilities",
+          "controlType": "toggle",
+          "enabledWhen": { "parameterId": "employ_chvs", "equals": true }
+        },
+        {
+          "parameterId": "expected_l45_live_birth_percentage",
+          "label": "Expected % live births at L4/5 before transfer",
+          "controlType": "percentageSlider",
+          "constraints": {
+            "minimumSource": "calculated_from_county_and_expected_anc_rate",
+            "maximum": 100,
+            "step": 1
+          },
+          "enabledWhen": { "parameterId": "increase_l45_live_births_enabled", "equals": true }
+        },
+        {
+          "parameterId": "memory_decay_months",
+          "label": "Memory decay period (months)",
+          "controlType": "integerSlider",
+          "constraints": { "minimum": 1, "maximum": 36, "step": 1 },
+          "enabledWhen": { "parameterId": "increase_l45_live_births_enabled", "equals": true }
+        },
+        {
+          "parameterId": "chv_memory_decay_model",
+          "label": "CHV memory decay model",
+          "controlType": "select",
+          "choices": [
+            { "value": "logistic_decay", "label": "Logistic Decay" },
+            { "value": "always_forget", "label": "Always Forget" },
+            { "value": "always_remember", "label": "Always Remember" }
+          ],
+          "enabledWhen": { "parameterId": "employ_chvs", "equals": true }
+        }
+      ]
+    },
+    {
+      "controlGroupId": "hss_supply",
+      "controlGroupLabel": "HSS Interventions (Supply)",
+      "controls": [
+        {
+          "parameterId": "upgrade_l45_facilities",
+          "label": "Upgrade L4/5 facilities",
+          "definition": "Enable supply-side improvements in L4/5 facilities",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "improve_healthcare_worker_performance_enabled",
+          "label": "Improve performance of healthcare workers",
+          "controlType": "toggle",
+          "enabledWhen": { "parameterId": "upgrade_l45_facilities", "equals": true }
+        },
+        {
+          "parameterId": "healthcare_worker_performance_level",
+          "label": "The performance level of healthcare workers",
+          "controlType": "percentageSlider",
+          "constraints": {
+            "minimumSource": "selected_county_baseline_worker_performance",
+            "maximum": 100,
+            "step": 5
+          },
+          "enabledWhen": { "parameterId": "improve_healthcare_worker_performance_enabled", "equals": true }
+        },
+        {
+          "parameterId": "increase_facility_capacity_enabled",
+          "label": "Increase facility capacity",
+          "controlType": "toggle",
+          "enabledWhen": { "parameterId": "upgrade_l45_facilities", "equals": true }
+        },
+        {
+          "parameterId": "facility_capacity_increase_percentage",
+          "label": "The facility capacity increases by",
+          "controlType": "percentageSlider",
+          "constraints": { "minimum": 0, "maximum": 100, "step": 5 },
+          "enabledWhen": { "parameterId": "increase_facility_capacity_enabled", "equals": true }
+        },
+        {
+          "parameterId": "increase_skilled_labor_enabled",
+          "label": "Increase number of skilled labor force",
+          "controlType": "toggle",
+          "enabledWhen": { "parameterId": "upgrade_l45_facilities", "equals": true }
+        },
+        {
+          "parameterId": "skilled_labor_ideal_percentage",
+          "label": "The ideal number of skilled labor force in L4/5",
+          "controlType": "percentageSlider",
+          "constraints": { "minimum": 0, "maximum": 100, "step": 5 },
+          "enabledWhen": { "parameterId": "increase_skilled_labor_enabled", "equals": true }
+        },
+        {
+          "parameterId": "increase_l45_equipment_enabled",
+          "label": "Increasing equipment in L4/5 facilities",
+          "controlType": "toggle",
+          "enabledWhen": { "parameterId": "upgrade_l45_facilities", "equals": true }
+        },
+        {
+          "parameterId": "l45_intrapartum_sensor_ideal_percentage",
+          "label": "The ideal number of intrapartum sensors in L4/5",
+          "controlType": "percentageSlider",
+          "constraints": { "minimum": 0, "maximum": 100, "step": 5 },
+          "enabledWhen": { "parameterId": "increase_l45_equipment_enabled", "equals": true }
+        },
+        {
+          "parameterId": "upgrade_rescue_network",
+          "label": "Upgrade Rescue network",
+          "controlType": "toggle"
+        },
+        {
+          "parameterId": "improve_referral_capacity_enabled",
+          "label": "Improve referral capacity",
+          "controlType": "toggle",
+          "enabledWhen": { "parameterId": "upgrade_rescue_network", "equals": true }
+        },
+        {
+          "parameterId": "free_referral_transport_percentage",
+          "label": "% referral with free taxies/bodas",
+          "controlType": "percentageSlider",
+          "enabledWhen": { "parameterId": "improve_referral_capacity_enabled", "equals": true }
+        },
+        {
+          "parameterId": "emergency_transfer_referral_enabled",
+          "label": "Referral with Emergency Transfer",
+          "controlType": "toggle",
+          "enabledWhen": { "parameterId": "improve_referral_capacity_enabled", "equals": true }
+        },
+        {
+          "parameterId": "emergency_transfer_support_percentage",
+          "label": "% emergency transfers supported",
+          "controlType": "percentageSlider",
+          "enabledWhen": { "parameterId": "emergency_transfer_referral_enabled", "equals": true }
+        }
+      ]
+    }
+  ]
+}

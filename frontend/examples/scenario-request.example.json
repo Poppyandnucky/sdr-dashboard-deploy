@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "requestId": "req_20260828_001",
+  "createdAt": "2026-08-28T18:30:00Z",
+  "sharedSettings": {
+    "countyId": "county_z",
+    "numberOfRuns": 10,
+    "numberOfMonths": 36,
+    "randomSeedStrategy": "matched_across_scenarios",
+    "randomSeed": 4281,
+    "confidenceIntervalMethod": "mean_per_run_poisson_bounds"
+  },
+  "outputSelection": {
+    "mode": "all_outcomes"
+  },
+  "referenceScenarioId": "baseline",
+  "scenarios": [
+    {
+      "scenarioId": "baseline",
+      "revision": 1,
+      "label": "Baseline",
+      "description": "Automatically created reference scenario with editable planning inputs.",
+      "scenarioRole": "reference",
+      "planningInputs": {
+        "additionalCHAs": 0
+      }
+    },
+    {
+      "scenarioId": "intervention_a",
+      "revision": 1,
+      "label": "Intervention A",
+      "description": "Adds 1,000 community health assistants.",
+      "scenarioRole": "comparison",
+      "planningInputs": {
+        "additionalCHAs": 1000
+      }
+    }
+  ]
+}

@@ -73,6 +73,24 @@ pre {
   font-size: 11px;
 }
 
+.outcome-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid #cbdad5;
+  background: #f6faf8;
+}
+
+.outcome-controls .field { grid-template-columns: 130px 1fr; margin: 0; }
+.plot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 16px; margin-top: 16px; }
+.plot-card { min-width: 0; padding: 14px; border: 1px solid #cbdad5; background: #fff; }
+.plot-card h3 { margin: 0 0 4px; font-size: 17px; }
+.plot-card p { min-height: 36px; margin: 0 0 8px; color: #586a64; font-size: 12px; line-height: 1.45; }
+.plot { width: 100%; min-height: 390px; }
+.chart-status { margin-top: 12px; }
+
 @media (max-width: 650px) {
   .field { grid-template-columns: 1fr; gap: 4px; }
+  .outcome-controls, .plot-grid { grid-template-columns: 1fr; }
 }

@@ -4,6 +4,9 @@ const app = document.getElementById("app");
 let bootstrap = null;
 let defaultConfig = null;
 let ui = null;
+let selectedOutcomeCategoryId = null;
+let selectedOutcomeId = null;
+let selectedLineScenarioId = null;
 
 const clone = value => JSON.parse(JSON.stringify(value));
 const esc = value => String(value).replace(/[&<>"']/g, character => ({
@@ -140,6 +143,123 @@ function treatment(name, label) {
   return `${toggle(label, `treatments.${name}.enabled`, item.enabled)}${item.enabled ? field("Coverage (%)", `treatments.${name}.coveragePercent`, item.coveragePercent, "number", 'min="0" max="100"') : ""}`;
 }
 
+function scenarioResult() {
+  return bootstrap.results?.scenarioResult || null;
+}
+
+function datasetFor(scenario, datasetId) {
+  return scenario?.datasets?.find(dataset => dataset.datasetId === datasetId);
+}
+
+function catalogOutcomeMenus() {
+  const categories = bootstrap.plotCatalog?.outcomeCategories || [];
+  if (!categories.length) return "";
+  const availableOutcomeIds = new Set((bootstrap.plotCatalog.plots || []).map(plot => plot.outcomeId));
+  const firstAvailableCategory = categories.find(category =>
+    category.outcomes.some(outcome => availableOutcomeIds.has(outcome.outcomeId))
+  ) || categories[0];
+  if (!categories.some(category => category.outcomeCategoryId === selectedOutcomeCategoryId)) {
+    selectedOutcomeCategoryId = firstAvailableCategory.outcomeCategoryId;
+  }
+  const category = categories.find(item => item.outcomeCategoryId === selectedOutcomeCategoryId);
+  if (!category.outcomes.some(outcome => outcome.outcomeId === selectedOutcomeId)) {
+    selectedOutcomeId = category.outcomes.find(outcome => availableOutcomeIds.has(outcome.outcomeId))?.outcomeId
+      || category.outcomes[0]?.outcomeId;
+  }
+  return `<section class="outcome-controls"><div class="field"><label>Outcome category</label>
+    <select id="outcome-category">${categories.map(item => `<option value="${esc(item.outcomeCategoryId)}" ${selected(item.outcomeCategoryId, selectedOutcomeCategoryId)}>${esc(item.outcomeCategoryLabel)}</option>`).join("")}</select></div>
+    <div class="field"><label>Outcome</label><select id="outcome">${category.outcomes.map(outcome =>
+      `<option value="${esc(outcome.outcomeId)}" ${selected(outcome.outcomeId, selectedOutcomeId)} ${availableOutcomeIds.has(outcome.outcomeId) ? "" : "disabled"}>${esc(outcome.outcomeLabel)}</option>`
+    ).join("")}</select></div></section>`;
+}
+
+function resultMarkup(result) {
+  if (!result) return `<h2>Outcomes</h2><div class="status">Run the model to view outcomes.</div>`;
+  const contract = result.scenarioResult;
+  if (!contract) return `<h2>Outcomes</h2><div class="status">This result does not include scenario datasets.</div>`;
+  const menus = catalogOutcomeMenus();
+  const plots = (bootstrap.plotCatalog?.plots || []).filter(plot => plot.outcomeId === selectedOutcomeId);
+  return `<h2>Outcomes</h2>${menus}<div id="plot-status" class="status chart-status" hidden></div>
+    <div class="plot-grid">${plots.map(plot => `<article class="plot-card"><h3>${esc(plot.display?.title || plot.plotLabel)}</h3><p>${esc(plot.description || "")}</p><div class="plot" id="plot-${esc(plot.plotId)}"></div></article>`).join("")}</div>`;
+}
+
+const plotColors = ["#17745d", "#e7765b", "#476f95", "#c49a36", "#775a9b", "#769b55"];
+const seriesValues = plot => plot.series?.values || plot.categories || [];
+const seriesLabel = (plot, id) => seriesValues(plot).find(value => value.id === id)?.label || id;
+const catalogValuesForField = field => (bootstrap.plotCatalog?.plots || [])
+  .find(item => item.series?.field === field)?.series?.values || [];
+const commonLayout = plot => ({
+  title: { text: plot.display?.title || plot.plotLabel, font: { size: 17 } },
+  margin: { l: 70, r: 25, t: 55, b: 70 }, paper_bgcolor: "#fff", plot_bgcolor: "#fff",
+  xaxis: { title: plot.x?.label, automargin: true, gridcolor: "#edf1ef" },
+  yaxis: { title: plot.y?.label, rangemode: "tozero", automargin: true, gridcolor: "#edf1ef" },
+  legend: { title: { text: plot.display?.legendTitle || plot.series?.label || "" }, orientation: "h", y: -0.25 },
+});
+
+function renderLinePlot(element, plot, contract) {
+  const scenario = contract.scenarios.find(item => item.scenarioId === selectedLineScenarioId) || contract.scenarios[0];
+  selectedLineScenarioId = scenario.scenarioId;
+  const rows = datasetFor(scenario, plot.datasetId)?.rows || [];
+  const traces = [];
+  seriesValues(plot).forEach((series, index) => {
+    const values = rows.filter(row => row[plot.series.field] === series.id).sort((a, b) => a[plot.x.field] - b[plot.x.field]);
+    traces.push({ x: values.map(row => row[plot.x.field]), y: values.map(row => row[plot.confidenceInterval.lowerField]), mode: "lines", line: { width: 0 }, hoverinfo: "skip", showlegend: false });
+    traces.push({ x: values.map(row => row[plot.x.field]), y: values.map(row => row[plot.confidenceInterval.upperField]), mode: "lines", fill: "tonexty", fillcolor: `${plotColors[index]}26`, line: { width: 0 }, hoverinfo: "skip", showlegend: false });
+    traces.push({ x: values.map(row => row[plot.x.field]), y: values.map(row => row[plot.y.field]), name: series.label, mode: "lines", line: { color: plotColors[index], width: 2.5 } });
+  });
+  const layout = commonLayout(plot);
+  layout.updatemenus = [{ type: "dropdown", x: 1, xanchor: "right", y: 1.18, buttons: contract.scenarios.map(item => ({
+    label: item.label, method: "skip", args: [item.scenarioId], execute: false,
+  })) }];
+  Plotly.newPlot(element, traces, layout, { responsive: true, displaylogo: false });
+  element.on("plotly_buttonclicked", event => { selectedLineScenarioId = event.button.args[0]; renderPlots(); });
+}
+
+function renderBarPlot(element, plot, contract) {
+  const facetValues = catalogValuesForField(plot.facet.field);
+  const facetLabel = id => facetValues.find(value => value.id === id)?.label || id;
+  const traces = contract.scenarios.map((scenario, index) => {
+    const rows = datasetFor(scenario, plot.datasetId)?.rows || [];
+    return { type: "bar", name: scenario.label, x: rows.map(row => facetLabel(row[plot.facet.field])), y: rows.map(row => row[plot.y.field]),
+      marker: { color: plotColors[index] }, error_y: { type: "data", symmetric: false, array: rows.map(row => row[plot.confidenceInterval.upperField] - row[plot.y.field]), arrayminus: rows.map(row => row[plot.y.field] - row[plot.confidenceInterval.lowerField]) } };
+  });
+  Plotly.newPlot(element, traces, { ...commonLayout(plot), barmode: "group" }, { responsive: true, displaylogo: false });
+}
+
+function renderNormalizedPlot(element, plot, contract) {
+  const traces = seriesValues(plot).map((series, index) => ({ type: "bar", name: series.label, x: contract.scenarios.map(item => item.label),
+    y: contract.scenarios.map(item => datasetFor(item, plot.datasetId)?.rows.find(row => row[plot.series.field] === series.id)?.[plot.y.field] ?? 0), marker: { color: plotColors[index] } }));
+  Plotly.newPlot(element, traces, { ...commonLayout(plot), barmode: "stack", yaxis: { ...commonLayout(plot).yaxis, range: [0, 1], tickformat: ".0%" } }, { responsive: true, displaylogo: false });
+}
+
+function renderDeltaPlot(element, plot, contract) {
+  const reference = contract.scenarios.find(item => item.scenarioId === contract.referenceScenarioId) || contract.scenarios[0];
+  const comparison = contract.scenarios.find(item => item.scenarioId !== reference.scenarioId);
+  if (!comparison) return;
+  const refRows = datasetFor(reference, plot.datasetId)?.rows || [];
+  const cmpRows = datasetFor(comparison, plot.datasetId)?.rows || [];
+  const categories = seriesValues(plot);
+  const base = categories.map(item => refRows.find(row => row.deathCauseId === item.id)?.[plot.y.field] ?? 0);
+  const changes = categories.map((item, index) => (cmpRows.find(row => row.deathCauseId === item.id)?.[plot.y.field] ?? 0) - base[index]);
+  const title = (plot.display?.titleTemplate || plot.plotLabel).replace("{referenceScenarioLabel}", reference.label).replace("{comparisonScenarioLabel}", comparison.label);
+  const layout = commonLayout(plot); layout.title.text = title; layout.barmode = "relative";
+  Plotly.newPlot(element, [{ type: "bar", name: reference.label, x: categories.map(item => item.label), y: base, marker: { color: plotColors[0] } },
+    { type: "bar", name: `${comparison.label} change`, x: categories.map(item => item.label), y: changes, marker: { color: plotColors[1] } }], layout, { responsive: true, displaylogo: false });
+}
+
+function renderPlots() {
+  const contract = scenarioResult();
+  if (!contract || typeof Plotly === "undefined") return;
+  (bootstrap.plotCatalog?.plots || []).filter(plot => plot.outcomeId === selectedOutcomeId).forEach(plot => {
+    const element = document.getElementById(`plot-${plot.plotId}`); if (!element) return;
+    if (plot.chartType === "lineWithConfidenceInterval") renderLinePlot(element, plot, contract);
+    else if (plot.chartType === "barWithConfidenceInterval") renderBarPlot(element, plot, contract);
+    else if (plot.chartType === "normalizedStackedBar") renderNormalizedPlot(element, plot, contract);
+    else if (plot.chartType === "referencePlusDeltaBar") renderDeltaPlot(element, plot, contract);
+  });
+  resize();
+}
+
 function renderHSS() {
   const h = ui.hss;
   const mode = `<div class="field"><label>Configuration mode</label><select data-path="hss.mode"><option value="manual" ${selected(h.mode, "manual")}>Manual</option><option value="preset" ${selected(h.mode, "preset")}>Preset</option></select></div>`;
@@ -179,8 +299,7 @@ function render() {
     <fieldset><legend>Model settings</legend>${field("Implementation years", "model.implementationYears", ui.model.implementationYears, "number", 'min="3" max="6"')}${field("Maintenance years", "model.maintenanceYears", ui.model.maintenanceYears, "number", 'min="0" max="3"')}${toggle("Run multiple scenarios", "model.multipleRun", ui.model.multipleRun)}${ui.model.multipleRun ? field("Number of runs", "model.numberOfRuns", ui.model.numberOfRuns, "number", 'min="1" max="300"') : ""}</fieldset>
     <button id="apply">Apply inputs</button><button id="run" class="primary">Run model</button><button id="reset">Reset</button>
     <h2>Status</h2><div id="status" class="status">${bootstrap.error ? `ERROR: ${esc(bootstrap.error.message)}` : result ? `Finished. JSON saved to:\n${esc(result.savedFile)}` : "Ready."}</div>
-    <h2>Baseline JSON preview</h2><pre>${result ? esc(JSON.stringify(result.baseline, null, 2)) : "No results yet."}</pre>
-    <h2>Intervention JSON preview</h2><pre>${result ? esc(JSON.stringify(result.intervention, null, 2)) : "No results yet."}</pre>`;
+    ${resultMarkup(result)}`;
 
   document.querySelectorAll("[data-path]").forEach(element => element.addEventListener("change", () => {
     const path = element.dataset.path.split(".");
@@ -194,6 +313,9 @@ function render() {
   document.getElementById("apply").onclick = () => emit("stateChanged");
   document.getElementById("run").onclick = event => { event.target.disabled = true; document.getElementById("status").textContent = "Running model…"; emit("runModel"); };
   document.getElementById("reset").onclick = () => { ui = null; emit("reset", false); };
+  document.getElementById("outcome-category")?.addEventListener("change", event => { selectedOutcomeCategoryId = event.target.value; selectedOutcomeId = null; render(); });
+  document.getElementById("outcome")?.addEventListener("change", event => { selectedOutcomeId = event.target.value; render(); });
+  renderPlots();
   resize();
 }
 

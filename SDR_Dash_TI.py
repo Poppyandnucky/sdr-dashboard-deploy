@@ -25,6 +25,7 @@ from parameter_loader import (
 from model_run import run_model_dash
 from global_func import reset_flags, reset_E, reset_HSS, reset_S, get_P_l45
 from debug_report import build_parameter_debug_report
+from scenario_results import build_mmr_datasets
 from concurrent.futures import ProcessPoolExecutor
 
 # Set to False to disable the parameter debug report feature entirely.
@@ -1815,6 +1816,13 @@ def _html_all_county_defaults(counties):
     return {county: _html_county_defaults(county) for county in counties}
 
 
+@st.cache_data(show_spinner=False)
+def _html_catalog(filename):
+    """Load an editor-maintained frontend catalog into the component bootstrap."""
+    catalog_path = Path(__file__).resolve().parent / "frontend" / filename
+    return json.loads(catalog_path.read_text(encoding="utf-8"))
+
+
 def _apply_html_ui_state(config):
     """Validate and apply configuration received from the JavaScript component."""
     global selected_county
@@ -1892,6 +1900,13 @@ def _run_html_model():
     intervention = pd.concat(intervention_frames, ignore_index=True)
     baseline_people = pd.concat(baseline_individual, ignore_index=True)
     intervention_people = pd.concat(intervention_individual, ignore_index=True)
+    confidence_interval_method = "mean_per_run_poisson_bounds"
+    baseline_datasets = build_mmr_datasets(
+        baseline, baseline_people, n_months, n_runs, confidence_interval_method
+    )
+    intervention_datasets = build_mmr_datasets(
+        intervention, intervention_people, n_months, n_runs, confidence_interval_method
+    )
     baseline_deaths_per_run, baseline_deaths_summary = _aggregate_mortality_death_causes(
         baseline_people
     )
@@ -1907,6 +1922,47 @@ def _run_html_model():
     # Individual records are no longer needed after aggregation and must not be
     # included in either the browser payload or saved JSON.
     del baseline_people, intervention_people
+    completed_at = datetime.now(timezone.utc)
+    request_id = completed_at.strftime("req_%Y%m%dT%H%M%S%fZ")
+    intervention_config = _html_ui_state()
+    baseline_config = {
+        "county": selected_county,
+        "flags": _json_safe(reset_flags()),
+        "E": _json_safe(reset_E()),
+        "S": _json_safe(reset_S(run_slider_params)),
+        "HSS": _json_safe(reset_HSS(run_slider_params)),
+        "model": _json_safe(copy.deepcopy(MODEL)),
+    }
+    scenario_result = {
+        "schemaVersion": 1,
+        "resultId": request_id.replace("req_", "result_", 1),
+        "requestId": request_id,
+        "completedAt": completed_at.isoformat(),
+        "status": "completed",
+        "modelVersion": "sdr-streamlit",
+        "sharedSettings": {
+            "countyId": selected_county,
+            "numberOfRuns": n_runs,
+            "numberOfMonths": n_months,
+            "randomSeedStrategy": "matched_across_scenarios",
+            "randomSeed": None,
+            "confidenceIntervalMethod": confidence_interval_method,
+        },
+        "outputSelection": {"mode": "all_outcomes"},
+        "referenceScenarioId": "baseline",
+        "scenarios": [
+            {
+                "scenarioId": "baseline", "revision": 1, "label": "Baseline",
+                "scenarioRole": "reference", "planningInputs": baseline_config,
+                "resolvedModelInputs": baseline_config, "datasets": baseline_datasets,
+            },
+            {
+                "scenarioId": "intervention", "revision": 1, "label": "Intervention",
+                "scenarioRole": "comparison", "planningInputs": intervention_config,
+                "resolvedModelInputs": intervention_config, "datasets": intervention_datasets,
+            },
+        ],
+    }
     result = {
         "county": selected_county,
         "nRuns": n_runs,
@@ -1917,6 +1973,7 @@ def _run_html_model():
             "perRun": _frame_for_html(death_causes_per_run),
             "summary": _frame_for_html(death_causes_summary),
         },
+        "scenarioResult": scenario_result,
     }
 
     output_dir = Path(__file__).resolve().parent / "outputs"
@@ -1939,6 +1996,7 @@ def _run_html_model():
             "perRun": _frame_for_json_file(death_causes_per_run),
             "summary": _frame_for_json_file(death_causes_summary),
         },
+        "scenarioResult": scenario_result,
     }
     output_path.write_text(
         json.dumps(file_payload, separators=(",", ":")),
@@ -2074,6 +2132,8 @@ def render_html_component_app():
             "countyDefaultsByCounty": _html_all_county_defaults(tuple(county_options)),
             "fqaPulseModifierOptions": FQA_PULSE_MODIFIER_OPTIONS,
             "pulseImplementationBoostOptions": PULSE_IMPLEMENTATION_BOOST_OPTIONS,
+            "controlCatalog": _html_catalog("control-catalog.json"),
+            "plotCatalog": _html_catalog("plot-catalog.json"),
             "state": _html_ui_state(),
             "results": st.session_state.get("html_results"),
             "error": st.session_state.get("html_error"),
