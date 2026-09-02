@@ -1,0 +1,1159 @@
+{
+  "system features": {
+    "Facility capacity ratio": {
+      "Capacity ratio": {
+        "ind_outcomes": [],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Facility_capacity_ideal",
+          "Facility_capacity_actual"
+        ],
+        "requires_ci": true,
+        "multiplier": 1
+      },
+      "Actual facility capacity": {
+        "ind_outcomes": [],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Facility_capacity_actual"
+        ],
+        "requires_ci": false
+      },
+      "Ideal facility capacity": {
+        "ind_outcomes": [],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Facility_capacity_ideal"
+        ],
+        "requires_ci": false
+      }
+    },
+    "Labor force ratio": {
+      "Surgical staff": {
+        "ind_outcomes": [],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Surgical_ratio",
+          "Surgical_actual",
+          "Surgical_needed"
+        ],
+        "levels": [
+          "L4",
+          "L5"
+        ],
+        "requires_ci": false
+      },
+      "Nurse staff": {
+        "ind_outcomes": [],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Nurse_ratio",
+          "Nurse_actual",
+          "Nurse_needed"
+        ],
+        "levels": [
+          "L4",
+          "L5"
+        ],
+        "requires_ci": false
+      },
+      "Anesthetist staff": {
+        "ind_outcomes": [],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Anesthetist_ratio",
+          "Anesthetist_actual",
+          "Anesthetist_needed"
+        ],
+        "levels": [
+          "L4",
+          "L5"
+        ],
+        "requires_ci": false
+      }
+    },
+    "Equipment inventory ratio": {
+      "Hand-held dopplers": {
+        "ind_outcomes": [],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Doppler_Ratio",
+          "Doppler_Actual",
+          "Doppler_Needed"
+        ],
+        "levels": [
+          "L2/3",
+          "L4",
+          "L5"
+        ],
+        "requires_ci": false
+      },
+      "CTGs": {
+        "ind_outcomes": [],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "CTG_Ratio",
+          "CTG_Actual",
+          "CTG_Needed"
+        ],
+        "levels": [
+          "L2/3",
+          "L4",
+          "L5"
+        ],
+        "requires_ci": false
+      }
+    }
+  },
+  "process indicators": {
+    "Distribution of live births": {
+      "Live births by delivery location": {
+        "ind_outcomes": [
+          "i_loc_new_v2"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    },
+    "High-risk pregnancies": {
+      "High-risk pregnancies rate": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_risk"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "High risk",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    },
+    "ANC rate": {
+      "4+ANC rate": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_ANC"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "ANC",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    },
+    "C-section rate": {
+      "Emergency C-sections": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_mod",
+          "i_unnecessary_cs"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Emergency CS",
+          "CS_unnessary",
+          "Live Births Final"
+        ],
+        "derived_variables": [
+          "Necessary emergency CS"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Elective C-sections": {
+        "ind_outcomes": [
+          "i_risk",
+          "i_mod",
+          "i_elec_CS"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Elective CS risk status",
+          "Risk status"
+        ],
+        "levels": [
+          "Lowrisk",
+          "Highrisk",
+          "All"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "All C-sections": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_mod"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "CS",
+          "Elective CS",
+          "Emergency CS",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    },
+    "Normal referral": {
+      "Self referrals": {
+        "ind_outcomes": [
+          "i_class",
+          "i_self_referral"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Self_referrals",
+          "Live Births Final"
+        ],
+        "levels": [
+          "Low SES",
+          "High SES",
+          "All"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Referrals using free bodas": {
+        "ind_outcomes": [
+          "i_class",
+          "i_free_referral"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Free_referrals",
+          "Live Births Final"
+        ],
+        "levels": [
+          "Low SES",
+          "High SES",
+          "All"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Total referrals": {
+        "ind_outcomes": [
+          "i_class",
+          "i_self_referral",
+          "i_free_referral"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Normal_referrals",
+          "Live Births Final"
+        ],
+        "levels": [
+          "Low SES",
+          "High SES",
+          "All"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    },
+    "Emergency transfer": {
+      "For predicted pre-labor complications": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_transfer_pred"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "ER_trans_pred",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "For actually occured complications": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_transfer_actual"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "ER_trans_actual",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    }
+  },
+  "implementation outcomes": {
+    "Cost Effectiveness": {
+      "Single Interventions (Drugs and Supplies)": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "DALY",
+          "i_pph_bundle",
+          "i_iv_iron",
+          "i_MgSO4",
+          "i_antibiotics"
+        ],
+        "track": [
+          "n_months",
+          "n_runs",
+          "int_period"
+        ],
+        "parameters": [
+          "i_param.cost_dict",
+          "i_param.USD_to_Ksh"
+        ],
+        "flags": [
+          "flag_pph_bundle",
+          "flag_iv_iron",
+          "flag_MgSO4",
+          "flag_antibiotics"
+        ],
+        "output_variables": [
+          "DALYs",
+          "Mothers with pph_bundle",
+          "Mothers with iv_iron",
+          "Mothers with MgSO4",
+          "Mothers with antibiotics"
+        ],
+        "requires_ci": false,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "POCUS": {
+        "ind_outcomes": [
+          "DALY",
+          "i_pocus"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "parameters": [
+          "i_param.cost_dict",
+          "i_param.USD_to_Ksh",
+          "i_param.num_L2/3",
+          "i_param.num_L4",
+          "i_param.num_L5"
+        ],
+        "flags": [
+          "flag_us"
+        ],
+        "output_variables": [
+          "DALYs"
+        ],
+        "requires_ci": false,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Intrapartum Sensors": {
+        "ind_outcomes": [
+          "DALY",
+          "i_sensors"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "parameters": [
+          "i_param.cost_dict",
+          "i_param.USD_to_Ksh"
+        ],
+        "flags": [
+          "flag_intrasensor"
+        ],
+        "output_variables": [
+          "DALYs",
+          "Doppler_Actual",
+          "CTG_Actual"
+        ],
+        "requires_ci": false,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "HSS Interventions": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "DALY",
+          "i_ANC",
+          "i_mod",
+          "i_free_referral",
+          "i_transfer",
+          "i_pph_bundle",
+          "i_iv_iron",
+          "i_MgSO4",
+          "i_antibiotics",
+          "i_sensors"
+        ],
+        "track": [
+          "n_months",
+          "n_runs",
+          "int_period"
+        ],
+        "parameters": [
+          "i_param.cost_dict",
+          "i_param.USD_to_Ksh",
+          "i_param.Capacity",
+          "i_param.HSS.capacity_added",
+          "i_param.dispatches_per_vehicle"
+        ],
+        "flags": [
+          "flag_SDR",
+          "flag_equipment",
+          "flag_pph_bundle",
+          "flag_iv_iron",
+          "flag_MgSO4",
+          "flag_antibiotics"
+        ],
+        "output_variables": [
+          "DALYs",
+          "Mothers with pph_bundle",
+          "Mothers with iv_iron",
+          "Mothers with MgSO4",
+          "Mothers with antibiotics",
+          "ANC",
+          "Fac non-CS",
+          "CS",
+          "Free_referrals",
+          "Emergency transfers",
+          "Surgical_actual",
+          "Nurse_actual",
+          "Anesthetist_actual",
+          "Doppler_Actual",
+          "CTG_Actual"
+        ],
+        "requires_ci": false,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    },
+    "DALYs": {
+      "Maternal": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "M_DALY"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "M_DALYs",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100000,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Neonatal": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "N_DALY"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "N_DALYs",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100000,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "All": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "DALY"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "DALYs",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100000,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    },
+    "DALYs averted": {
+      "Maternal": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "M_DALY"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "M_DALYs",
+          "Live Births Final"
+        ],
+        "requires_ci": false,
+        "multiplier": 100000,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Neonatal": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "N_DALY"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "N_DALYs",
+          "Live Births Final"
+        ],
+        "requires_ci": false,
+        "multiplier": 100000,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "All": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "DALY"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "DALYs",
+          "Live Births Final"
+        ],
+        "requires_ci": false,
+        "multiplier": 100000,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    }
+  },
+  "maternal outcomes": {
+    "Maternal complication rate": {
+      "All complications": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_comp_death_new"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Comps after transfer",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Anemia": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_anemia_new"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Anemia",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Prolonged labor": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_PL_new"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "PL",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "PPH": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_pph_new"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "pph",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Sepsis": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_mat_sepsis_new"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "mat_sepsis",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Eclampsia": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_eclampsia_new"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "eclampsia",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Obstructed labor": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_OL_final"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "OL",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Ruptured uterus": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_ruptured_uterus"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "ruptured_uterus",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Antepartum hemorrhage": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_aph"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "aph",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    },
+    "Severe maternal outcomes": {
+      "SMO rate": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_severe_new"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "severe_comps",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Death rate among SMOs": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_mat_death",
+          "i_severe_new"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Deaths",
+          "severe_comps"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    },
+    "Maternal mortality rate": {
+      "MMR by location": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_mat_death"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Deaths",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100000,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Distribution of Causes": {
+        "ind_outcomes": [
+          "Run",
+          "Scenario",
+          "death_cause",
+          "i_mat_death"
+        ],
+        "track": [
+          "Run",
+          "Scenario"
+        ],
+        "output_variables": [
+          "death_cause"
+        ],
+        "requires_ci": false,
+        "scenario_dataframes": [
+          "b_ind_outcomes",
+          "i_ind_outcomes"
+        ]
+      },
+      "Death by cause": {
+        "ind_outcomes": [
+          "Run",
+          "Scenario",
+          "death_cause",
+          "i_mat_death"
+        ],
+        "track": [
+          "Run",
+          "Scenario"
+        ],
+        "output_variables": [
+          "death_cause"
+        ],
+        "requires_ci": false,
+        "scenario_dataframes": [
+          "b_ind_outcomes",
+          "i_ind_outcomes"
+        ]
+      }
+    }
+  },
+  "neonatal outcomes": {
+    "Preterm rate": {
+      "Preterm": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_preterm"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Preterm",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    },
+    "Neonatal complication rate": {
+      "RDS": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_RDS"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "RDS",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "IVH": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_IVH"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "IVH",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Sepsis": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_neo_sepsis"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "neo_sepsis",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "NEC": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_NEC"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "NEC",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "hypoxia": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_hypoxia"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "hypoxia",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "asphyxia": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_asphyxia"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "asphyxia",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 100,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    },
+    "Neonatal mortality rate": {
+      "Neonatal mortality": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_neo_death"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "Neonatal Deaths",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 1000,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      }
+    },
+    "Stillbirth rate": {
+      "Intrapartum": {
+        "ind_outcomes": [
+          "i_loc_new_v2",
+          "i_stillbirth"
+        ],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [
+          "stillbirths",
+          "Live Births Final"
+        ],
+        "requires_ci": true,
+        "multiplier": 1000,
+        "scenario_dataframes": [
+          "b_df",
+          "i_df"
+        ]
+      },
+      "Antepartum": {
+        "ind_outcomes": [],
+        "track": [
+          "n_months",
+          "n_runs"
+        ],
+        "output_variables": [],
+        "requires_ci": false,
+        "status": "placeholder in SDR_Dash_TI.py"
+      }
+    }
+  }
+}

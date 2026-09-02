@@ -19,6 +19,13 @@ from parameter_loader import (
 from model_run import run_model_dash
 from global_func import reset_flags, reset_E, reset_HSS, reset_S, get_P_l45
 from debug_report import build_parameter_debug_report
+from cost import (
+    calculate_sdr_costs,
+    clean_cost_table,
+    get_cost_parameters,
+    infer_sdr_cost_tier,
+    summarize_by_t_ci,
+)
 from concurrent.futures import ProcessPoolExecutor
 
 # Set to False to disable the parameter debug report feature entirely.
@@ -2777,493 +2784,171 @@ if st.session_state.b_df is not None and st.session_state.i_df is not None:
                 return df_ind
 
             if selected_plot == "Cost Effectiveness":
-                st.markdown("<h3 style='text-align: left;'>Cost per DALY averted</h3>",
+                st.markdown("<h3 style='text-align: left;'>Cost per maternal DALY averted</h3>",
                             unsafe_allow_html=True)
-                tab1, tab2, tab3, tab4 = st.tabs(["Single Interventions (Drugs and Supplies)", "POCUS", "Intrapartum Sensors", "HSS Interventions"])
 
-                cost_dic = i_param['cost_dict']
-
-                cost_dic = {key: value / i_param['USD_to_Ksh'] for key, value in cost_dic.items()}  #convert Ksh to USD
-
-                def prepare_df_ce(df, indicator, n_months, n_runs, scenario, n_cols):
-                    indicator = np.concatenate(df[indicator].values).reshape(-1, n_cols)
-                    column_names = [f'Col{i + 1}' for i in range(n_cols)]
-                    df_indicator = pd.DataFrame(indicator, columns=column_names)
-                    df_indicator['All'] = np.sum(df_indicator, axis=1)
-                    df_indicator = df_indicator.drop(columns=column_names)
-                    df_indicator = df_indicator.rename(columns={'All': 'Counts'})
-                    df_indicator['Month'] = np.tile(np.arange(1, n_months+1), n_runs)
-                    df_indicator['Scenario'] = scenario
-                    df_indicator = df_indicator.groupby(['Month', 'Scenario'], as_index=False).mean()
-                    return df_indicator
-
-                def acum_ind_df(indicator, ncols, order):
-                    df_ind_base = prepare_df_ce(b_df, indicator, n_months, n_runs, 'Baseline', ncols)
-                    df_ind_int = prepare_df_ce(i_df, indicator, n_months, n_runs, 'Intervention', ncols)
-                    df_ind_base['Cumulative_Counts'] = df_ind_base['Counts'].cumsum()
-                    df_ind_int['Cumulative_Counts'] = df_ind_int['Counts'].cumsum()
-                    df_ind_diff = df_ind_base[['Month']].copy()
-                    df_ind_diff['Cum_Count_Diff'] = df_ind_base['Cumulative_Counts'] - df_ind_int['Cumulative_Counts'] if order == 'baseline first' else df_ind_int['Cumulative_Counts'] - df_ind_base['Cumulative_Counts']
-                    df_ind_diff['Count_Diff'] = df_ind_base['Counts'] - df_ind_int['Counts'] if order == 'baseline first' else df_ind_int['Counts'] - df_ind_base['Counts']
-                    df_ind_diff['Count_Int'] = df_ind_int['Counts']
-                    df_ind_diff['Cum_Count_Int'] = df_ind_int['Cumulative_Counts']
-                    return df_ind_diff
-
-                df_daly_avt = acum_ind_df('DALYs', 4,'baseline first')
-                df_daly_avt = df_daly_avt.rename(columns={'Cum_Count_Diff': 'DALY averted'})
-
-                months = list(range(1, n_months + 1))
-                # FIXED COST
-                def fixed_cost_by_month(cost_type):
-                    cost = np.array([(cost_type / int_period) * month \
-                                         if month <= int_period else cost_type for month in months
-                                     ])
-                    return cost
-
-                #COST FOR SINGLE INTERVENTIONS
-                df_pph_bundle = acum_ind_df('Mothers with pph_bundle', 4,'intervention first')
-                df_pph_bundle['Cost'] = df_pph_bundle['Cum_Count_Diff'] * cost_dic['pph_bundle']
-                df_pph_bundle['Cost'] = df_pph_bundle['Cost'].clip(lower=0) if i_flags["flag_pph_bundle"] == 1 else 0
-                df_pph_bundle['Type'] = "PPH bundle"
-
-                df_iv_iron = acum_ind_df('Mothers with iv_iron', 4,'intervention first')
-                df_iv_iron['Cost'] = df_iv_iron['Cum_Count_Diff'] * cost_dic['iv_iron'] if i_flags["flag_iv_iron"] == 1 else 0
-                df_iv_iron['Cost'] = df_iv_iron['Cost'].clip(lower=0)
-                df_iv_iron['Type'] = "IV iron"
-
-                df_MgSO4 = acum_ind_df('Mothers with MgSO4', 4,'intervention first')
-                df_MgSO4['Cost'] = df_MgSO4['Cum_Count_Diff'] * cost_dic['MgSO4'] if i_flags["flag_MgSO4"] == 1 else 0
-                df_MgSO4['Cost'] = df_MgSO4['Cost'].clip(lower=0)
-                df_MgSO4['Type'] = "MgSO4"
-
-                df_antibiotics = acum_ind_df('Mothers with antibiotics', 4,'intervention first')
-                df_antibiotics['Cost'] = df_antibiotics['Cum_Count_Diff'] * cost_dic['antibiotics']
-                df_antibiotics['Cost'] = df_antibiotics['Cost'].clip(lower=0) if i_flags["flag_antibiotics"] == 1 else 0
-                df_antibiotics['Type'] = "Antibiotics"
-
-                df_single_cost = pd.concat([df_pph_bundle, df_iv_iron, df_MgSO4, df_antibiotics], ignore_index=True)
-                df_single_cost_all = df_single_cost.groupby('Month', as_index=False)['Cost'].sum()
-
-                ##COST FOR POCUS
-                if i_flags['flag_us'] == 1:
-                    num_pocus = i_param['num_L4'] + i_param['num_L5'] + i_param['num_L2/3']  #each facility has one POCUS machine
-                    pocus_cost = cost_dic['POCUS'] * num_pocus
-                    cum_pocus_cost = np.array([pocus_cost for month in months])
+                if str(selected_county).strip().lower() != "kakamega":
+                    st.info("Cost effectiveness is currently available for Kakamega only.")
+                elif not i_flags.get("flag_SDR"):
+                    st.markdown(
+                        "<p style='font-size:24px;'>Please adjust sliders under Health System Strengthening (HSS) Interventions to view cost effectiveness.</p>",
+                        unsafe_allow_html=True,
+                    )
                 else:
-                    num_pocus = 0
-                    cum_pocus_cost = np.zeros(n_months - 1)
+                    try:
+                        cost_results = calculate_sdr_costs(
+                            b_df,
+                            i_df,
+                            get_cost_parameters(),
+                            implementation_years=MODEL["imple_time"],
+                            maintenance_years=MODEL["main_time"],
+                            scenario_name="Intervention",
+                            scenario_tier=infer_sdr_cost_tier(i_param["HSS"]),
+                            include_general_equipment=bool(i_flags.get("flag_equipment", 1)),
+                        )
+                    except Exception as exc:
+                        st.error(f"Cost calculation failed: {exc}")
+                    else:
+                        component_yearly = clean_cost_table(cost_results["component_yearly"])
+                        nonzero_cost_types = (
+                            component_yearly.groupby("cost_type")["cost_discounted_yearly"]
+                            .sum()
+                            .abs()
+                        )
+                        nonzero_cost_types = nonzero_cost_types[nonzero_cost_types > 1e-9].index
+                        component_yearly = component_yearly[
+                            component_yearly["cost_type"].isin(nonzero_cost_types)
+                        ].copy()
+                        dalys_yearly = cost_results["dalys_averted_yearly"].copy()
+                        icer_yearly = cost_results["icer_yearly"].replace([np.inf, -np.inf], np.nan)
 
+                        final_year = int(icer_yearly["year"].max())
+                        final_icer = icer_yearly[icer_yearly["year"] == final_year].copy()
+                        mean_cum_cost = final_icer["cumulative_discounted_cost"].mean()
+                        mean_cum_dalys = final_icer["cumulative_dalys_averted"].mean()
+                        ratio_icer = mean_cum_cost / mean_cum_dalys if mean_cum_dalys > 0 else np.nan
+                        mean_run_icer = final_icer["cost_per_daly_averted"].mean()
 
-                # COST FOR 4+ANC VISITS
-                df_anc = acum_ind_df('ANC', 4, 'intervention first')
-                df_anc['Cost'] = df_anc['Cum_Count_Diff'] * cost_dic['SDR ANC']
-                df_anc['Cost'] = df_anc['Cost'].clip(lower=0)
-                df_anc['Type'] = "4+ANCs"
+                        icer_summary = summarize_by_t_ci(
+                            icer_yearly.dropna(subset=["cost_per_daly_averted"]),
+                            "cost_per_daly_averted",
+                            ["year"],
+                        ).rename(
+                            columns={
+                                "year": "Year",
+                                "mean": "cost_per_daly_averted",
+                                "lower_CI": "Lower_CI",
+                                "upper_CI": "Upper_CI",
+                            }
+                        )
 
-                # COST FOR NORMAL DELIVERY
-                df_fac_delivery = acum_ind_df('Fac non-CS', 4,'intervention first')
-                df_fac_delivery['Cost'] = df_fac_delivery['Cum_Count_Diff'] * cost_dic['SDR Fac Delivery']
-                df_fac_delivery['Cost'] = df_fac_delivery['Cost'].clip(lower=0)
-                df_fac_delivery['Type'] = "Normal deliveries"
-
-                # COST FOR C-SECTION DELIVERY
-                df_cs_delivery = acum_ind_df('CS', 4,'intervention first')
-                df_cs_delivery['Cost'] = df_cs_delivery['Cum_Count_Diff'] * cost_dic['SDR CS Delivery']
-                df_cs_delivery['Cost'] = df_cs_delivery['Cost'].clip(lower=0)
-                df_cs_delivery['Type'] = "C-sections"
-
-                # COST FOR NORMAL REFERRALS
-                df_refer = acum_ind_df('Free_referrals', 2,'intervention first')
-                max_monthly_refers = max(df_refer['Count_Int'].max(), 0)
-                num_taxes_needed = math.ceil(max_monthly_refers / i_param['dispatches_per_vehicle'])
-                setup_cost = num_taxes_needed * cost_dic['SDR Taxi Setup']
-
-                cum_setup_cost = fixed_cost_by_month(setup_cost)
-                cum_monthly_cost = np.array([cost_dic['SDR Taxi Monthly'] * month for month in months]) * num_taxes_needed
-                cum_dispatch_cost = np.array([cost_dic['SDR Taxi Dispatch'] * df_refer['Cum_Count_Int'].loc[month - 1] for month in months])
-                cum_refer_cost = cum_setup_cost + cum_monthly_cost + cum_dispatch_cost
-                df_refer['Cost'] = cum_refer_cost
-                df_refer['Type'] = "Normal referrals"
-
-                # COST FOR EMERGENCY TRANSFERS - assuming all of them supported by facility-own ambulances
-                df_transfer = acum_ind_df("Emergency transfers", 4,'intervention first')
-                #max_monthly_transfers = max(df_transfer['Count_Int'].max(), 0)
-                max_monthly_transfers = max(df_transfer['Count_Diff'].max(), 0)
-                num_ambulances_needed = math.ceil(max_monthly_transfers / i_param['dispatches_per_vehicle'])
-                setup_cost = num_ambulances_needed * cost_dic['SDR Ambulance Setup']
-
-                cum_setup_cost = fixed_cost_by_month(setup_cost)
-                cum_monthly_cost = np.array([cost_dic['SDR Ambulance Monthly'] * month for month in months]) * num_ambulances_needed
-                cum_dispatch_cost = np.array([cost_dic['SDR Ambulance Dispatch'] * df_transfer['Cum_Count_Diff'].loc[month - 1] for month in months])
-                cum_dispatch_cost = np.maximum(cum_dispatch_cost, 0)
-                cum_transfer_cost = cum_setup_cost + cum_monthly_cost + cum_dispatch_cost
-                df_transfer['Cost'] = cum_transfer_cost
-                df_transfer['Type'] = "Emergency transfers"
-
-                # COST FOR WORKFORCE
-                df_surgical_labor = acum_ind_df('Surgical_actual', 2,'intervention first')
-                num_surgical_needed = max(df_surgical_labor['Count_Diff'].max(), 0)
-                monthly_surgical_salary = num_surgical_needed * cost_dic['SDR surgical staff']
-                cum_surgical_salary = np.array([monthly_surgical_salary * month for month in months])
-
-                df_nurse_labor = acum_ind_df('Nurse_actual', 2,'intervention first')
-                num_nurse_needed = max(df_nurse_labor['Count_Diff'].max(), 0)
-                monthly_nurse_salary = num_nurse_needed * cost_dic['SDR nurse staff']
-                cum_nurse_salary = np.array([monthly_nurse_salary * month for month in months])
-
-                df_anesthetist_labor = acum_ind_df('Anesthetist_actual', 2,'intervention first')
-                num_anesthetist_needed = max(df_anesthetist_labor['Count_Diff'].max(), 0)
-                monthly_anesthetist_salary = num_anesthetist_needed * cost_dic['SDR anesthetist']
-                cum_anesthetist_salary = np.array([monthly_anesthetist_salary * month for month in months])
-
-                cum_labor_cost = cum_surgical_salary + cum_nurse_salary + cum_anesthetist_salary
-                df_labor = pd.DataFrame({'Month': months,
-                                        'Cost': cum_labor_cost,
-                                        'Type': 'Direct Labor'
-                                        }
-                                    )
-
-                # COST FOR SENSORS
-                df_doppler = acum_ind_df('Doppler_Actual', 3,'intervention first')
-                num_doppler_needed = max(df_doppler['Count_Diff'].max(), 0)
-                doppler_cost = num_doppler_needed * cost_dic['Doppler']
-                cum_doppler_cost = np.array([doppler_cost for month in months])
-
-                df_ctg = acum_ind_df('CTG_Actual', 3,'intervention first')
-                num_ctg_needed = max(df_ctg['Count_Diff'].max(), 0)
-                ctg_cost = num_ctg_needed * cost_dic['CTG']
-                cum_ctg_cost = np.array([ctg_cost for month in months])
-                cum_sensor_cost = cum_doppler_cost + cum_ctg_cost
-                df_sensor = pd.DataFrame({'Month': months,
-                                        'Cost': cum_sensor_cost,
-                                        'Type': 'Intrapartum Sensors'
-                                        }
-                                    )
-
-                flag_single = 1 if (
-                            i_flags['flag_pph_bundle'] or i_flags['flag_iv_iron'] or i_flags['flag_MgSO4'] or i_flags[
-                        'flag_antibiotics']) else 0
-                flag_HSS = 1 if i_flags['flag_SDR'] else 0
-                flag_pocus = 1 if i_flags['flag_us'] else 0
-                flag_sensor = 1 if i_flags['flag_intrasensor'] else 0
-
-                with tab1:
-                    if flag_single and not flag_HSS and not flag_pocus and not flag_sensor:
-                        df_cost = pd.concat([df_pph_bundle, df_iv_iron, df_MgSO4, df_antibiotics], ignore_index=True)
-                        df_cost_all = df_cost.groupby('Month', as_index=False)['Cost'].sum()
-                        df_ce = df_daly_avt.copy()
-                        df_ce['Cost per DALY averted'] = df_cost_all['Cost'] / df_daly_avt['DALY averted']
+                        cost_by_type = (
+                            component_yearly.groupby(["year", "cost_type"], as_index=False)
+                            .agg(cost_discounted_yearly=("cost_discounted_yearly", "mean"))
+                            .rename(columns={"year": "Year", "cost_type": "Cost type"})
+                        )
 
                         col1, col2 = st.columns(2)
                         with col1:
-                            #plot cost effectiveness over month
-                            chart = (
-                                alt.Chart(df_ce)
-                                .mark_line()
+                            line = (
+                                alt.Chart(icer_summary)
+                                .mark_line(color="#0B6FCB")
                                 .encode(
-                                    x=alt.X("Month:Q", title="Time since the start of intervention implementation (Months)"),
-                                    y=alt.Y("Cost per DALY averted:Q", axis=alt.Axis(title="USD")),
-                                    tooltip=["Month:N", "Cost per DALY averted:Q"]
+                                    x=alt.X("Year:O", title="Year since intervention implementation"),
+                                    y=alt.Y(
+                                        "cost_per_daly_averted:Q",
+                                        axis=alt.Axis(title="Cost per maternal DALY averted (USD)"),
+                                    ),
+                                    tooltip=["Year:O", "cost_per_daly_averted:Q", "Lower_CI:Q", "Upper_CI:Q"],
                                 )
-                                .properties(width=700, height=400)
-                                .interactive()
                             )
-
-                            chart = chart.properties(
-                                title=alt.TitleParams(text="Accumulated Cost per DALY averted", anchor="middle")
+                            band = (
+                                alt.Chart(icer_summary)
+                                .mark_area(opacity=0.2, color="#0B6FCB")
+                                .encode(
+                                    x=alt.X("Year:O"),
+                                    y=alt.Y("Lower_CI:Q", title="Cost per maternal DALY averted (USD)"),
+                                    y2="Upper_CI:Q",
+                                )
                             )
-
-                            st.altair_chart(chart)
-
-                            num = df_ce['Cost per DALY averted'].iloc[-1]
+                            st.altair_chart((band + line).properties(
+                                width=700,
+                                height=400,
+                                title=alt.TitleParams(
+                                    text="Cumulative cost per maternal DALY averted",
+                                    anchor="middle",
+                                ),
+                            ).interactive())
                             st.markdown(
-                                f"<p style='font-size:30px;'>Cost per DALY averted by the end: USD {num:.0f}</p>",
-                                unsafe_allow_html=True
+                                f"<p style='font-size:30px;'>Mean run-level ICER by year {final_year}: USD {mean_run_icer:.0f} per maternal DALY averted</p>"
+                                f"<p style='font-size:22px;'>Ratio of mean cumulative cost to mean cumulative DALYs averted: USD {ratio_icer:.0f}</p>",
+                                unsafe_allow_html=True,
                             )
 
                         with col2:
-                            #plot cost by type over month
-                            chart = (
-                                alt.Chart(df_cost)
+                            st.altair_chart(
+                                alt.Chart(cost_by_type)
                                 .mark_line()
                                 .encode(
-                                    x=alt.X("Month:Q", title="Time since the start of intervention implementation (Months)"),
-                                    y=alt.Y("Cost:Q", axis=alt.Axis(title="USD")),
-                                    color=alt.Color("Type:N", legend=alt.Legend(title="Intervention")),
-                                    tooltip=["Month:N", "Type:N", "Cost:Q"]
+                                    x=alt.X("Year:O", title="Year since intervention implementation"),
+                                    y=alt.Y(
+                                        "cost_discounted_yearly:Q",
+                                        axis=alt.Axis(title="Annual discounted incremental cost (USD)"),
+                                    ),
+                                    color=alt.Color("Cost type:N", legend=alt.Legend(title="Cost type")),
+                                    tooltip=["Year:O", "Cost type:N", "cost_discounted_yearly:Q"],
                                 )
-                                .properties(width=700, height=400)
+                                .properties(
+                                    width=700,
+                                    height=400,
+                                    title=alt.TitleParams(
+                                        text="Annual discounted incremental cost by type",
+                                        anchor="middle",
+                                    ),
+                                )
                                 .interactive()
                             )
-
-                            chart = chart.properties(
-                                title=alt.TitleParams(text="Accumulated Cost by Single Interventions", anchor="middle")
-                            )
-
-                            st.altair_chart(chart)
-
-                            num_mothers = np.sum(np.array([23729, 18196, 20709, 5127])) / 12 * n_months
-
-                            cost_pph_bundle = df_cost[df_cost['Type'] == 'PPH bundle']['Cost'].iloc[-1] / num_mothers
-                            cost_iv_iron = df_cost[df_cost['Type'] == 'IV iron']['Cost'].iloc[-1] / num_mothers
-                            cost_MgSO4 = df_cost[df_cost['Type'] == 'MgSO4']['Cost'].iloc[-1] / num_mothers
-                            cost_antibiotics = df_cost[df_cost['Type'] == 'Antibiotics']['Cost'].iloc[-1] / num_mothers
-
                             st.markdown(
-                                f"<p style='font-size:30px;'>Accumulated Cost for {num_mothers:.0f} dyads over {n_months} months</p>"
-                                f"<p style='font-size:24px;'>PPH bundle: USD {cost_pph_bundle:.2f} per dyad</p>"
-                                f"<p style='font-size:24px;'>IV iron infusion: USD {cost_iv_iron:.2f} per dyad</p>"
-                                f"<p style='font-size:24px;'>MgSO4: USD {cost_MgSO4:.2f} per dyad</p>"
-                                f"<p style='font-size:24px;'>Antibiotics: USD {cost_antibiotics:.2f} per dyad</p>"
-                                ,
-                                unsafe_allow_html=True
+                                f"<p style='font-size:30px;'>Mean cumulative discounted cost by year {final_year}: USD {mean_cum_cost:,.0f}</p>"
+                                f"<p style='font-size:22px;'>Mean cumulative maternal DALYs averted: {mean_cum_dalys:,.0f}</p>",
+                                unsafe_allow_html=True,
                             )
-                    else:
-                        st.markdown("<p style='font-size:24px;'>Please only adjust sliders under Treatment interventions (Drugs and Supplies) to view cost effectiveness</p>",
-                                    unsafe_allow_html=True)
 
-                with tab2:
-                    if flag_pocus and not flag_HSS and not flag_single and not flag_sensor:
-                        df_pocus_ce = pd.DataFrame({'Month': months,
-                                                    'Cost': cum_pocus_cost,
-                                                    'DALY averted': df_daly_avt['DALY averted']
-                                                    })
-
-                        df_pocus_ce['Cost per DALY averted'] = df_pocus_ce['Cost'] / df_pocus_ce['DALY averted']
-
-                        chart = (alt.Chart(
-                            df_pocus_ce
-                        ).mark_line().encode(
-                            x=alt.X('Month:Q', title='Month'),
-                            y=alt.Y('Cost per DALY averted:Q', axis=alt.Axis(title='USD')),
-                            tooltip=['Month:N', 'Cost per DALY averted:Q']
-                        ).properties(width=700, height=400).interactive())
-
-                        chart = chart.properties(
-                            title=alt.TitleParams(text='Accumulated Cost per DALY averted', anchor='middle')
+                        summary_table = pd.DataFrame(
+                            {
+                                "Metric": [
+                                    "Mean cumulative discounted cost",
+                                    "Mean cumulative maternal DALYs averted",
+                                    "Mean run-level ICER",
+                                    "Ratio ICER",
+                                ],
+                                "Value": [mean_cum_cost, mean_cum_dalys, mean_run_icer, ratio_icer],
+                            }
                         )
+                        st.dataframe(summary_table, use_container_width=True)
 
-                        st.altair_chart(chart)
-
-                        num = df_pocus_ce['Cost per DALY averted'].iloc[-1]
-                        st.markdown(
-                            f"<p style='font-size:30px;'>Cost per DALY averted by the end: USD {num:.0f} with {num_pocus} POCUS machines</p>",
-                            unsafe_allow_html=True
-                        )
-                    else:
-                        st.markdown("<p style='font-size:24px;'>Please only adjust sliders under AI portable ultrasound to view cost effectiveness</p>",
-                                    unsafe_allow_html=True)
-
-                with tab3:
-                    if flag_sensor and not flag_HSS and not flag_single and not flag_pocus:
-                        df_sensor_ce = pd.DataFrame({'Month': months,
-                                                    'Cost': cum_sensor_cost,
-                                                    'DALY averted': df_daly_avt['DALY averted']
-                                                    })
-
-                        df_sensor_ce['Cost per DALY averted'] = df_sensor_ce['Cost'] / df_sensor_ce['DALY averted']
-
-                        chart = (alt.Chart(
-                            df_sensor_ce
-                        ).mark_line().encode(
-                            x=alt.X('Month:Q', title='Month'),
-                            y=alt.Y('Cost per DALY averted:Q', axis=alt.Axis(title='USD')),
-                            tooltip=['Month:N', 'Cost per DALY averted:Q']
-                        ).properties(width=700, height=400).interactive())
-
-                        chart = chart.properties(
-                            title=alt.TitleParams(text='Accumulated Cost per DALY averted', anchor='middle')
-                        )
-
-                        st.altair_chart(chart)
-
-                        num = df_sensor_ce['Cost per DALY averted'].iloc[-1]
-                        st.markdown(
-                            f"<p style='font-size:30px;'>Cost per DALY averted by the end: USD {num:.0f} with {num_doppler_needed:.0f} Doppler machines and {num_ctg_needed:.0f} CTG machines</p>",
-                            unsafe_allow_html=True
-                        )
-                    else:
-                        st.markdown("<p style='font-size:24px;'>Please only adjust sliders under Intrapartum sensors to view cost effectiveness</p>",
-                                    unsafe_allow_html=True)
-
-                with tab4:
-                    if flag_HSS:
-                        added_capacity = i_param["Capacity"] * i_param["HSS"]["capacity_added"]
-                        beds_needed = math.ceil (added_capacity / (83 / 12))
-
-                        fixed_cost_total = cost_dic['SDR PM'] + cost_dic['SDR Infra'] * beds_needed + cost_dic['SDR Equip']
-
-                        # CONTINOUS COST
-                        def maintain_cost_PM(cost_type):
-                            cost = np.array([(cost_type / 12) * month \
-                                        if month > int_period else 0 for month in months
-                                    ])
-                            return cost
-
-                        maintain_cost_PM = maintain_cost_PM(cost_dic['SDR PM2'])
-
-                        df_sdr_cost = pd.DataFrame({'Month': months,
-                                                    'Program Management': fixed_cost_by_month(cost_dic['SDR PM']) + maintain_cost_PM,
-                                                    'Infrastructure': fixed_cost_by_month(cost_dic['SDR Infra'] * beds_needed),
-                                                    'Equipment': fixed_cost_by_month(cost_dic['SDR Equip']) * i_flags['flag_equipment'] + df_sensor['Cost'],
-                                                    'Direct Labor': df_labor['Cost'],
-                                                    'Normal Referrals': df_refer['Cost'],
-                                                    'Emergency Transfers': df_transfer['Cost'],
-                                                    'ANCs': df_anc['Cost'],
-                                                    'Single Interventions': df_single_cost_all['Cost'],
-                                                    'Normal Deliveries': df_fac_delivery['Cost'],
-                                                    'C-sections': df_cs_delivery['Cost']
-                                                    }
-                                                   )
-
-                        SDR_cost_total = df_sdr_cost['Program Management'] + df_sdr_cost['Infrastructure'] \
-                                         + df_sdr_cost['Equipment'] + df_sdr_cost['Direct Labor'] \
-                                         + df_sdr_cost['Normal Referrals'] + df_sdr_cost['Emergency Transfers'] \
-                                         + df_sdr_cost['ANCs'] + df_sdr_cost['Single Interventions'] \
-                                         + df_sdr_cost['Normal Deliveries'] + df_sdr_cost['C-sections']
-
-                        df_sdr_cost = df_sdr_cost.melt(id_vars=['Month'], var_name='Type', value_name='Cost')
-
-                        df_sdr_ce = pd.DataFrame({'Month': months,
-                                                    'Cost': SDR_cost_total,
-                                                    'DALY averted': df_daly_avt['DALY averted']
-                                                    })
-
-                        df_sdr_ce['Cost per DALY averted'] = df_sdr_ce['Cost'] / df_sdr_ce['DALY averted']
-
-                        # Replace negative values with None (to exclude them from the plot)
-                        df_sdr_ce.loc[df_sdr_ce['Cost per DALY averted'] < 0, 'Cost per DALY averted'] = None
-
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            # plot cost effectiveness over month
-                            chart = (
-                                alt.Chart(df_sdr_ce)
-                                .mark_line()
-                                .encode(
-                                    x=alt.X("Month:Q", title="Time since the start of intervention implementation (Months)"),
-                                    y=alt.Y("Cost per DALY averted:Q", axis=alt.Axis(title="Cost per DALY averted in USD")),
-                                    tooltip=["Month:N", "Cost per DALY averted:Q"]
-                                )
-                                .properties(width=700, height=400)
-                                .interactive()
-                            )
-
-                            chart = chart.properties(
-                                title=alt.TitleParams(text="Accumulated Cost per DALY averted", anchor="middle")
-                            )
-
-                            st.altair_chart(chart)
-
-                            num = df_sdr_ce['Cost per DALY averted'].iloc[-1]
-                            st.markdown(
-                                f"<p style='font-size:30px;'>Cost per DALY averted by the end: USD {num:.0f}</p>",
-                                unsafe_allow_html=True
-                            )
-
-
-                            def cost_per_daly_matplotlib(df_sdr_ce):
-                                fig, ax = plt.subplots(figsize=(8, 5))  # Define figure size
-
-                                # Plot the cost per DALY averted
-                                ax.plot(df_sdr_ce["Month"], df_sdr_ce["Cost per DALY averted"], linewidth=2,
-                                        color="tab:blue")
-
-                                # Labels and Title
-                                ax.set_xlabel("Time since the start of intervention implementation (Months)",
-                                              fontsize=14)
-                                ax.set_ylabel("Cost per DALY averted in USD", fontsize=14)
-                                ax.set_title("Accumulated Cost per DALY Averted", fontsize=16)
-
-                                # Grid, Formatting, and Layout
-                                ax.grid(True, linestyle="--", alpha=0.5)
-                                plt.xticks(fontsize=12)
-                                plt.yticks(fontsize=12)
-                                plt.tight_layout()
-
-                                return fig
-
-
-                            # fig = cost_per_daly_matplotlib(df_sdr_ce)
-                            # st.pyplot(fig)  # Show plot in Streamlit
-                            #
-                            # # Enable Download of the Chart
-                            # img_buffer = io.BytesIO()
-                            # fig.savefig(img_buffer, format="png", dpi=300)
-                            # st.download_button(label="Download Cost per DALY Averted Plot", data=img_buffer.getvalue(),
-                            #                    file_name="cost_per_daly.png", mime="image/png",
-                            #                    key="download_cost_daly")
-
-                        with col2:
-                            # plot cost by type over month
-                            chart = (
-                                alt.Chart(df_sdr_cost)
-                                .mark_line()
-                                .encode(
-                                    x=alt.X("Month:Q", title="Time since the start of intervention implementation (Months)"),
-                                    y=alt.Y("Cost:Q", axis=alt.Axis(title="USD")),
-                                    color=alt.Color("Type:N", legend=alt.Legend(title="Intervention")),
-                                    tooltip=["Month:N", "Type:N", "Cost:Q"]
-                                )
-                                .properties(width=700, height=400)
-                                .interactive()
-                            )
-
-                            chart = chart.properties(
-                                title=alt.TitleParams(text="Accumulated Cost by SDR Interventions", anchor="middle")
-                            )
-
-                            st.altair_chart(chart)
-
-                            cost_pm = df_sdr_cost[df_sdr_cost['Type'] == 'Program Management']['Cost'].iloc[-1]
-                            cost_infra = df_sdr_cost[df_sdr_cost['Type'] == 'Infrastructure']['Cost'].iloc[-1]
-                            cost_equip = df_sdr_cost[df_sdr_cost['Type'] == 'Equipment']['Cost'].iloc[-1]
-                            cost_labor = df_sdr_cost[df_sdr_cost['Type'] == 'Direct Labor']['Cost'].iloc[-1]
-                            cost_refer = df_sdr_cost[df_sdr_cost['Type'] == 'Normal Referrals']['Cost'].iloc[-1]
-                            cost_transfer = df_sdr_cost[df_sdr_cost['Type'] == 'Emergency Transfers']['Cost'].iloc[-1]
-                            cost_single = df_sdr_cost[df_sdr_cost['Type'] == 'Single Interventions']['Cost'].iloc[-1]
-                            cost_anc = df_sdr_cost[df_sdr_cost['Type'] == 'ANCs']['Cost'].iloc[-1]
-                            cost_normal = df_sdr_cost[df_sdr_cost['Type'] == 'Normal Deliveries']['Cost'].iloc[-1]
-                            cost_cs = df_sdr_cost[df_sdr_cost['Type'] == 'C-sections']['Cost'].iloc[-1]
-
-                            st.markdown(
-                                f"<p style='font-size:30px;'>Accumulated Cost by SDR Interventions</p>"
-                                f"<p style='font-size:24px;'>Program Management: USD {cost_pm:.0f}</p>"
-                                f"<p style='font-size:24px;'>Infrastructure: USD {cost_infra:.0f} for expanding {beds_needed} beds</p>"
-                                f"<p style='font-size:24px;'>Equipment: USD {cost_equip:.0f}, including {num_doppler_needed:.0f} Doppler machines and {num_ctg_needed:.0f} CTG machines</p>"
-                                f"<p style='font-size:24px;'>Direct Labor: USD {cost_labor:.0f} with additional {num_surgical_needed:.0f} surgical staff, {num_nurse_needed:.0f} nurses/midwifes, and {num_anesthetist_needed:.0f} anesthetists</p>"
-                                f"<p style='font-size:24px;'>Normal Referrals: USD {cost_refer:.0f} with {num_taxes_needed:.0f} taxis</p>"
-                                f"<p style='font-size:24px;'>Emergency Transfers: USD {cost_transfer:.0f} with {num_ambulances_needed:.0f} ambulances</p>"
-                                f"<p style='font-size:24px;'>Single Interventions: USD {cost_single:.0f}</p>"
-                                f'<p style="font-size:24px;">ANCs: USD {cost_anc:.0f}</p>'
-                                f'<p style="font-size:24px;">Normal Deliveries: USD {cost_normal:.0f}</p>'
-                                f'<p style="font-size:24px;">C-sections: USD {cost_cs:.0f}</p>'
-                                ,
-                                unsafe_allow_html=True
-                            )
-
-                        col3, col4, col5, col6 = st.columns(4)
+                        col3, col4, col5 = st.columns(3)
                         with col3:
-                            scenario_name = st.text_input("**Enter Intervention Scenario Name:**", placeholder="e.g., Scenario_1")
-
-                            # Ensure a scenario name is entered
-                            if scenario_name:
-                                file_name1 = f"{scenario_name}ICER.csv"
-                                csv_sdr_ce = df_sdr_ce.to_csv(index=False)
-                                st.download_button(label=f"📥 Download {file_name1}", data=csv_sdr_ce,
-                                                   file_name=file_name1,
-                                                   mime="text/csv")
-                                file_name2 = f"{scenario_name}COST.csv"
-                                csv_sdr_cost = df_sdr_cost.to_csv(index=False)
-                                st.download_button(label=f"📥 Download {file_name2}", data=csv_sdr_cost,
-                                                   file_name=file_name2,
-                                                   mime="text/csv")
-
-                    else:
-                        st.markdown("<p style='font-size:24px;'>Please adjust sliders under Health System Strengthening (HSS) Interventions to view cost effectiveness</p>",
-                                    unsafe_allow_html=True)
-                        st.markdown("<p style='font-size:18px;'>---Sliders under single interventions can also be adjusted together to see combined cost effectiveness</p>",
-                                    unsafe_allow_html=True)
+                            st.download_button(
+                                label="Download cost components",
+                                data=component_yearly.to_csv(index=False),
+                                file_name="dashboard_cost_components.csv",
+                                mime="text/csv",
+                            )
+                        with col4:
+                            st.download_button(
+                                label="Download ICER table",
+                                data=icer_yearly.to_csv(index=False),
+                                file_name="dashboard_icer.csv",
+                                mime="text/csv",
+                            )
+                        with col5:
+                            st.download_button(
+                                label="Download DALYs averted",
+                                data=dalys_yearly.to_csv(index=False),
+                                file_name="dashboard_dalys_averted.csv",
+                                mime="text/csv",
+                            )
 
             if selected_plot == "Labor force ratio":
                 st.markdown("<h3 style='text-align: left;'>Labor force ratio</h3>",

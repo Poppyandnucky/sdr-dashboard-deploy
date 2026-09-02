@@ -6,7 +6,8 @@ import streamlit as st
 from parameter_loader import reset_inputs
 from LB_effect import f_LB_effect_vectorized
 from mortality import f_MM_vectorized
-from global_func import labor_calculator, fetal_sensor_calculator, DALY_calculator_vectorized
+from global_func import labor_calculator, fetal_sensor_calculator
+from daly import DALY_calculator_vectorized
 from intrapartum import intrapartum_effect_vectorized
 
 
@@ -22,7 +23,7 @@ def run_model_dash(param, flags, n_months, int_period, base_seed = None):
                 'High risk', 'PL', 'hypoxia', 'OL', 'mat_sepsis', 'pph', 'stillbirths', "eclampsia", 'ruptured_uterus', 'aph', 'severe_comps', 'severe_pph',
                 'CS', 'CS_unnessary', 'Elective CS', 'Emergency CS', 'Elective CS risk status', 'Risk status',
                 'AVD', 'SVD', 'Anemia', "ER_trans_actual", "ER_trans_pred", "Emergency transfers",
-                "Comps after transfer", 'Deaths', 'M_DALYs', 'N_DALYs', 'DALYs',
+                "Comps after transfer", 'Deaths', 'M_DALYs', 'M_YLLs', 'M_YLDs', 'N_DALYs', 'DALYs',
                 #only facility level indicators
                 'Facility_capacity_actual', 'Facility_capacity_ideal', 'Capacity Ratio',
                 'Surgical_actual', 'Nurse_actual', 'Anesthetist_actual',
@@ -110,15 +111,28 @@ def run_model_dash(param, flags, n_months, int_period, base_seed = None):
             df.loc[i, "ER_trans_pred"] = M["ER_trans_pred"]
             df.loc[i, "Emergency transfers"] = M["ER_trans_actual"] + M["ER_trans_pred"]
             #M_DALYs_old, N_DALYs_old = DALY_calculator(df, param, i)
-            M_DALYs_new, N_DALYs_new, M_DALY_ind, N_DALY_ind = DALY_calculator_vectorized(individual_outcomes, param)
+            (
+                M_DALYs_new,
+                M_YLLs_new,
+                M_YLDs_new,
+                N_DALYs_new,
+                M_DALY_ind,
+                M_YLL_ind,
+                M_YLD_ind,
+                N_DALY_ind,
+            ) = DALY_calculator_vectorized(individual_outcomes, param)
 
             df.loc[i, "M_DALYs"] = M_DALYs_new
+            df.loc[i, "M_YLLs"] = M_YLLs_new
+            df.loc[i, "M_YLDs"] = M_YLDs_new
             df.loc[i, "N_DALYs"] = N_DALYs_new
             df.loc[i, "DALYs"] = (df.loc[i, "M_DALYs"] + df.loc[i, "N_DALYs"])
             df.loc[i, 'L4/5 LBs'] = round(track['LB_Track'][i, 2] + track['LB_Track'][i, 3])
 
             #update daly
             individual_df["M_DALY"] = M_DALY_ind
+            individual_df["M_YLL"] = M_YLL_ind
+            individual_df["M_YLD"] = M_YLD_ind
             individual_df["N_DALY"] = N_DALY_ind
             individual_df["DALY"] = individual_df["M_DALY"] + individual_df["N_DALY"]
             df_individual_temp.append(individual_df)
