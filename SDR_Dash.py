@@ -1820,9 +1820,10 @@ with st.sidebar:
                 st.session_state.model_finished = False
                 st.session_state.selected_outcomes = []
 
+                effective_n_runs = int(MODEL["n_runs"]) if MODEL["multiple_run"] else 1
                 current_config = {
                                 "multiple_run": MODEL["multiple_run"],
-                                "n_runs": MODEL["n_runs"],
+                                "n_runs": effective_n_runs,
                                 "n_months": MODEL["n_months"],
                                 "compare_two_interventions": st.session_state.compare_two_interventions
                             }
@@ -1866,150 +1867,155 @@ with st.sidebar:
                     st.info("Intervention A has been captured. Please adjust settings and click Run again to execute Intervention B.")
                     st.stop()
 
-                if not MODEL["multiple_run"]:  # SINGLE RUN MODE
-                    num_seeds = n_months
-                    base_seeds = make_shifted_run_seeds(1, num_seeds)[0]
-                    base_seed = int(base_seeds[0])
+                # Single-run and multiple-run modes share this seeded loop.
+                # When the multiple-run checkbox is off, effective_n_runs is 1.
+                i_df, b_df, i_ind_outcomes, b_ind_outcomes = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+                total_runs = effective_n_runs
+                run_mode_label = "Multiple Runs" if MODEL["multiple_run"] else "Single Run"
+                run_seeds_matrix = make_shifted_run_seeds(total_runs, n_months)
 
-                    b_param = get_parameters(rng=np.random.default_rng(base_seed), county=selected_county)
+                # --- BASELINE RUNS ---
+                # seeds = np.random.default_rng(2025).integers(low=0, high=1e6, size=total_runs * n_months)
+
+                # Always rerun the baseline on every "Run Model" click (single-run mode
+                # already does this unconditionally above) so that changing settings that
+                # aren't tracked in current_config -- e.g. the selected county -- can never
+                # leave a stale cached baseline in place.
+                status.text(f"⏳ Running Reference Model for {run_mode_label}...")
+
+                temp_b_df = []  # Store results in list before concatenating (better performance)
+                temp_b_ind_outcomes = []
+
+                #for i in range(total_runs):
+                for run_index in range(total_runs):
+                    iter_start_time = time.time()
+
+                    # Reset flags and initialize parameters for each run
+                    monthly_seeds_for_this_run = run_seeds_matrix[run_index]
+                    # Use the VERY FIRST seed of this run's sequence to generate parameters
+                    param_rng = np.random.default_rng(monthly_seeds_for_this_run[0])
+                    b_param = get_parameters(rng=param_rng, county=selected_county)
                     b_param = calculate_derived_parameters(b_param)
 
-                    i_param = get_parameters(rng=np.random.default_rng(base_seed), county=selected_county)
-                    i_param = calculate_derived_parameters(i_param)
-                    if ENABLE_PARAM_DEBUG_REPORT:
-                        debug_loader_param = copy.deepcopy(i_param)
-                    # base_seed = np.random.default_rng().integers(low=0, high=1e6, size=1)[0]
-                    # rng_param = np.random.default_rng(base_seed)
-
-                    # b_param = get_parameters(rng = rng_param)
-                    # b_param = calculate_derived_parameters(b_param)
-                    b_flags = reset_flags()
-                    b_HSS = reset_HSS(slider_params)
-                    b_S = reset_S(slider_params)
-                    b_E = reset_E()
+                    b_flags, b_HSS, b_S, b_E = reset_flags(), reset_HSS(slider_params), reset_S(slider_params), reset_E()
                     if compare_two_interventions and st.session_state.dual_first_config is not None:
                         b_flags = copy.deepcopy(st.session_state.dual_first_config["flags"])
                         b_E = copy.deepcopy(st.session_state.dual_first_config["E"])
                         b_S = copy.deepcopy(st.session_state.dual_first_config["S"])
                         b_HSS = copy.deepcopy(st.session_state.dual_first_config["HSS"])
-
                     b_param.update({"E": b_E, "S": b_S, "HSS": b_HSS})
                     if compare_two_interventions:
                         sync_param_momish_from_hss(b_param, b_HSS, b_flags)
-                    i_param.update({"E": i_E, "S": i_S, "HSS": i_HSS})
-                    sync_param_momish_from_hss(i_param, i_HSS, i_flags)
-                    if ENABLE_PARAM_DEBUG_REPORT:
-                        debug_final_param = copy.deepcopy(i_param)
 
-                    # rng_clone = np.random.default_rng(base_seed)
-                    # i_param = get_parameters(rng = rng_clone)
-                    # i_param = calculate_derived_parameters(i_param)
-                    # i_param.update({"E": i_E, "S": i_S, "HSS": i_HSS})
+                    # Pass the ARRAY of monthly seeds to run_model_dash
+                    b_df_i, b_ind_outcomes_i, _ = run_model_dash(b_param, b_flags, n_months, int_period, base_seed=monthly_seeds_for_this_run)
 
-                    # Run baseline model only if not already stored
-                    # Always run baseline with the same base_seeds as intervention below.
-                    # If we skipped this when b_df was cached, intervention would use newly drawn seeds
-                    # while baseline stayed on old seeds (misaligned comparisons — e.g. MOMISH-only runs).
-                    status.text("⏳ Running Baseline Model...")
-                    b_df, b_ind_outcomes, _ = run_model_dash(b_param, b_flags, n_months, int_period, base_seed=base_seeds)
-                    b_ind_outcomes["Run"] = 1
-                    b_ind_outcomes["Scenario"] = st.session_state.reference_label if compare_two_interventions else "Baseline"
-                    st.session_state.b_df = b_df
-                    st.session_state.b_ind_outcomes = b_ind_outcomes
-                    status.text("✅ Baseline Model Completed!")
+                    b_df_i["Run"] = run_index + 1
+                    b_ind_outcomes_i["Run"] = run_index + 1
+                    b_ind_outcomes_i["Scenario"] = st.session_state.reference_label if compare_two_interventions else "Baseline"
+                    temp_b_df.append(b_df_i)
+                    temp_b_ind_outcomes.append(b_ind_outcomes_i)
 
-                    # Run intervention model
-                    status.text("⏳ Running Comparison Model...")
+                    # rng_param = np.random.default_rng(base_seed)
+                    # b_param = get_parameters(rng = rng_param)
+                    # b_param = calculate_derived_parameters(b_param)
+                    # #st.text(b_param)
+                    # b_flags, b_HSS, b_S, b_E = reset_flags(), reset_HSS(slider_params), reset_S(slider_params), reset_E()
+                    # b_param.update({"E": b_E, "S": b_S, "HSS": b_HSS})
+
+                    # # Run baseline model only once per iteration
                     # rng_model = np.random.default_rng(base_seed)
-                    i_df, i_ind_outcomes, _ = run_model_dash(i_param, i_flags, n_months, int_period, base_seed = base_seeds)
-                    #i_df, i_ind_outcomes, _ = run_model_dash(i_param, i_flags, n_months, int_period, rng = rng_model)
-                    i_ind_outcomes["Run"] = 1
-                    i_ind_outcomes["Scenario"] = st.session_state.target_label if compare_two_interventions else "Intervention"
+                    # b_df_i, b_ind_outcomes_i, _ = run_model_dash(b_param, b_flags, n_months, int_period, base_seed = base_seeds)
+                    # #b_df_i, b_ind_outcomes_i, _ = run_model_dash(b_param, b_flags, n_months, int_period,
+                    #                                          rng=None)
+                    # Time tracking & progress update
+                    iter_time_taken = time.time() - iter_start_time
+                    avg_time_per_run = iter_time_taken if avg_time_per_run is None else (
+                                                                                                    avg_time_per_run * run_index + iter_time_taken) / (
+                                                                                                    run_index + 1)
+                    remaining_time = avg_time_per_run * (total_runs - (run_index + 1))
+                    progress_bar.progress((run_index + 1) / total_runs)
+                    status.text(f"⏳ Running Reference Model... {run_index + 1}/{total_runs} runs completed. "
+                                f"Estimated time left: {remaining_time / 60:.1f} min.")
+                    # st.text(f"CPU usage: {psutil.cpu_percent()}%")
+                    # usage_per_core = psutil.cpu_percent(percpu=True)
+                    # for i, usage in enumerate(usage_per_core):
+                    #     st.text(f"Core {i}: {usage}%")
+                    #
+                    # def print_resource_usage(interval=1, repeat=10):
+                    #     process = psutil.Process(os.getpid())
+                    #
+                    #     for i in range(repeat):
+                    #         cpu = psutil.cpu_percent(interval=interval)
+                    #         mem_info = process.memory_info()
+                    #         mem_mb = mem_info.rss / (1024 ** 2)  # Convert bytes to MB
+                    #
+                    #         st.text(f"[{i + 1}] CPU Usage: {cpu:.1f}% | Memory Usage: {mem_mb:.2f} MB")
+                    #
+                    # print_resource_usage()
 
-                    # In A/B mode, also run plain baseline once for column comparison
-                    if compare_two_interventions:
-                        status.text("⏳ Running Plain Baseline for A/B column comparison...")
-                        base_param = get_parameters(rng=np.random.default_rng(base_seed), county=selected_county)
-                        base_param = calculate_derived_parameters(base_param)
-                        base_flags = reset_flags()
-                        base_HSS = reset_HSS(slider_params)
-                        base_S = reset_S(slider_params)
-                        base_E = reset_E()
-                        base_param.update({"E": base_E, "S": base_S, "HSS": base_HSS})
-                        ab_base_df, ab_base_ind_outcomes, _ = run_model_dash(base_param, base_flags, n_months, int_period, base_seed=base_seeds)
-                        ab_base_ind_outcomes["Run"] = 1
-                        ab_base_ind_outcomes["Scenario"] = "Baseline"
-                        st.session_state.ab_base_df = ab_base_df
-                        st.session_state.ab_base_ind_outcomes = ab_base_ind_outcomes
+                # Store final baseline results in session state
+                st.session_state.b_df_multiple = pd.concat(temp_b_df, ignore_index=True)
+                st.session_state.b_ind_outcomes = pd.concat(temp_b_ind_outcomes, ignore_index=True)
 
-                    # Retrieve cached baseline results
-                    b_df = st.session_state.b_df
-                    b_ind_outcomes = st.session_state.b_ind_outcomes
-                    st.session_state.b_param = b_param
-                    st.session_state.i_param = i_param
+                status.text("✅ Reference Model Completed!")
 
-                    # Update progress bar to 100%
-                    progress_bar.progress(100)
+                # Retrieve baseline results just computed above
+                b_df = st.session_state.b_df_multiple
+                b_ind_outcomes = st.session_state.b_ind_outcomes
 
-                else:  # MULTIPLE RUNS MODE
-                    i_df, b_df, i_ind_outcomes, b_ind_outcomes = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-                    total_runs = MODEL["n_runs"]
-                    run_seeds_matrix = make_shifted_run_seeds(total_runs, n_months)
+                # Run Intervention Model for Each Run
+                temp_i_df = []
+                temp_i_ind_outcomes = []
 
-                    # --- BASELINE RUNS ---
-                    # seeds = np.random.default_rng(2025).integers(low=0, high=1e6, size=total_runs * n_months)
+                flag_process_pool = False
 
-                    # Always rerun the baseline on every "Run Model" click (single-run mode
-                    # already does this unconditionally above) so that changing settings that
-                    # aren't tracked in current_config -- e.g. the selected county -- can never
-                    # leave a stale cached baseline in place.
-                    status.text("⏳ Running Reference Model for Multiple Runs...")
-
-                    temp_b_df = []  # Store results in list before concatenating (better performance)
-                    temp_b_ind_outcomes = []
-
+                if flag_process_pool:
+                    pass
+                    # with ProcessPoolExecutor() as executor:
+                    #     results = list(executor.map(compute_one_run, data_inputs))
+                else:
                     #for i in range(total_runs):
                     for run_index in range(total_runs):
                         iter_start_time = time.time()
 
-                        # Reset flags and initialize parameters for each run
                         monthly_seeds_for_this_run = run_seeds_matrix[run_index]
-                        # Use the VERY FIRST seed of this run's sequence to generate parameters
+
+                        # Use the exact same seed to generate identical starting parameters
                         param_rng = np.random.default_rng(monthly_seeds_for_this_run[0])
-                        b_param = get_parameters(rng=param_rng, county=selected_county)
-                        b_param = calculate_derived_parameters(b_param)
+                        i_param = get_parameters(rng=param_rng, county=selected_county)
+                        i_param = calculate_derived_parameters(i_param)
+                        if ENABLE_PARAM_DEBUG_REPORT and run_index == 0:
+                            debug_loader_param = copy.deepcopy(i_param)
+                        i_param.update({"E": i_E, "S": i_S, "HSS": i_HSS})
+                        sync_param_momish_from_hss(i_param, i_HSS, i_flags)
+                        if ENABLE_PARAM_DEBUG_REPORT and run_index == 0:
+                            debug_final_param = copy.deepcopy(i_param)
 
-                        b_flags, b_HSS, b_S, b_E = reset_flags(), reset_HSS(slider_params), reset_S(slider_params), reset_E()
-                        if compare_two_interventions and st.session_state.dual_first_config is not None:
-                            b_flags = copy.deepcopy(st.session_state.dual_first_config["flags"])
-                            b_E = copy.deepcopy(st.session_state.dual_first_config["E"])
-                            b_S = copy.deepcopy(st.session_state.dual_first_config["S"])
-                            b_HSS = copy.deepcopy(st.session_state.dual_first_config["HSS"])
-                        b_param.update({"E": b_E, "S": b_S, "HSS": b_HSS})
-                        if compare_two_interventions:
-                            sync_param_momish_from_hss(b_param, b_HSS, b_flags)
+                        # Pass the exact same ARRAY of monthly seeds
+                        i_df_i, i_ind_outcomes_i, _ = run_model_dash(i_param, i_flags, n_months, int_period, base_seed=monthly_seeds_for_this_run)
 
-                        # Pass the ARRAY of monthly seeds to run_model_dash
-                        b_df_i, b_ind_outcomes_i, _ = run_model_dash(b_param, b_flags, n_months, int_period, base_seed=monthly_seeds_for_this_run)
-
-                        b_df_i["Run"] = run_index + 1
-                        b_ind_outcomes_i["Run"] = run_index + 1
-                        b_ind_outcomes_i["Scenario"] = st.session_state.reference_label if compare_two_interventions else "Baseline"
-                        temp_b_df.append(b_df_i)
-                        temp_b_ind_outcomes.append(b_ind_outcomes_i)
-
+                        i_df_i["Run"] = run_index + 1
+                        i_ind_outcomes_i["Run"] = run_index + 1
+                        i_ind_outcomes_i["Scenario"] = st.session_state.target_label if compare_two_interventions else "Intervention"
+                        temp_i_df.append(i_df_i)
+                        temp_i_ind_outcomes.append(i_ind_outcomes_i)
+                        # Reset flags and initialize parameters for each run
                         # rng_param = np.random.default_rng(base_seed)
-                        # b_param = get_parameters(rng = rng_param)
-                        # b_param = calculate_derived_parameters(b_param)
-                        # #st.text(b_param)
-                        # b_flags, b_HSS, b_S, b_E = reset_flags(), reset_HSS(slider_params), reset_S(slider_params), reset_E()
-                        # b_param.update({"E": b_E, "S": b_S, "HSS": b_HSS})
+                        # i_param = get_parameters(rng = rng_param)
+                        # i_param = calculate_derived_parameters(i_param)
+                        # #st.text(i_param)
+                        # i_param.update({"E": i_E, "S": i_S, "HSS": i_HSS})
 
-                        # # Run baseline model only once per iteration
+                        # # Run intervention model
                         # rng_model = np.random.default_rng(base_seed)
-                        # b_df_i, b_ind_outcomes_i, _ = run_model_dash(b_param, b_flags, n_months, int_period, base_seed = base_seeds)
-                        # #b_df_i, b_ind_outcomes_i, _ = run_model_dash(b_param, b_flags, n_months, int_period,
-                        #                                          rng=None)
+                        # i_df_i, i_ind_outcomes_i, _ = run_model_dash(i_param, i_flags, n_months, int_period, base_seed = base_seed)
+                        # i_df_i["Run"] = run_index + 1
+                        # i_ind_outcomes_i["Run"] = run_index + 1
+                        # i_ind_outcomes_i["Scenario"] = "Intervention"
+                        # temp_i_df.append(i_df_i)
+                        # temp_i_ind_outcomes.append(i_ind_outcomes_i)
+
                         # Time tracking & progress update
                         iter_time_taken = time.time() - iter_start_time
                         avg_time_per_run = iter_time_taken if avg_time_per_run is None else (
@@ -2017,131 +2023,43 @@ with st.sidebar:
                                                                                                         run_index + 1)
                         remaining_time = avg_time_per_run * (total_runs - (run_index + 1))
                         progress_bar.progress((run_index + 1) / total_runs)
-                        status.text(f"⏳ Running Reference Model... {run_index + 1}/{total_runs} runs completed. "
+                        status.text(f"⏳ Running Comparison Model... {run_index + 1}/{total_runs} runs completed. "
                                     f"Estimated time left: {remaining_time / 60:.1f} min.")
                         # st.text(f"CPU usage: {psutil.cpu_percent()}%")
                         # usage_per_core = psutil.cpu_percent(percpu=True)
                         # for i, usage in enumerate(usage_per_core):
                         #     st.text(f"Core {i}: {usage}%")
-                        #
-                        # def print_resource_usage(interval=1, repeat=10):
-                        #     process = psutil.Process(os.getpid())
-                        #
-                        #     for i in range(repeat):
-                        #         cpu = psutil.cpu_percent(interval=interval)
-                        #         mem_info = process.memory_info()
-                        #         mem_mb = mem_info.rss / (1024 ** 2)  # Convert bytes to MB
-                        #
-                        #         st.text(f"[{i + 1}] CPU Usage: {cpu:.1f}% | Memory Usage: {mem_mb:.2f} MB")
-                        #
-                        # print_resource_usage()
 
-                    # Store final baseline results in session state
-                    st.session_state.b_df_multiple = pd.concat(temp_b_df, ignore_index=True)
-                    st.session_state.b_ind_outcomes = pd.concat(temp_b_ind_outcomes, ignore_index=True)
+                # Store intervention results
+                i_df = pd.concat(temp_i_df, ignore_index=True)
+                i_ind_outcomes = pd.concat(temp_i_ind_outcomes, ignore_index=True)
 
-                    status.text("✅ Reference Model Completed!")
+                # In A/B mode, also run plain baseline for multiple runs
+                if compare_two_interventions:
+                    status.text("⏳ Running Plain Baseline for A/B column comparison...")
+                    temp_ab_base_df = []
+                    temp_ab_base_ind_outcomes = []
+                    for run_index in range(total_runs):
+                        monthly_seeds_for_this_run = run_seeds_matrix[run_index]
+                        param_rng = np.random.default_rng(monthly_seeds_for_this_run[0])
+                        base_param = get_parameters(rng=param_rng, county=selected_county)
+                        base_param = calculate_derived_parameters(base_param)
+                        base_flags = reset_flags()
+                        base_HSS = reset_HSS(slider_params)
+                        base_S = reset_S(slider_params)
+                        base_E = reset_E()
+                        base_param.update({"E": base_E, "S": base_S, "HSS": base_HSS})
+                        ab_base_df_i, ab_base_ind_outcomes_i, _ = run_model_dash(base_param, base_flags, n_months, int_period, base_seed=monthly_seeds_for_this_run)
+                        ab_base_df_i["Run"] = run_index + 1
+                        ab_base_ind_outcomes_i["Run"] = run_index + 1
+                        ab_base_ind_outcomes_i["Scenario"] = "Baseline"
+                        temp_ab_base_df.append(ab_base_df_i)
+                        temp_ab_base_ind_outcomes.append(ab_base_ind_outcomes_i)
 
-                    # Retrieve baseline results just computed above
-                    b_df = st.session_state.b_df_multiple
-                    b_ind_outcomes = st.session_state.b_ind_outcomes
+                    st.session_state.ab_base_df = pd.concat(temp_ab_base_df, ignore_index=True)
+                    st.session_state.ab_base_ind_outcomes = pd.concat(temp_ab_base_ind_outcomes, ignore_index=True)
 
-                    # Run Intervention Model for Each Run
-                    temp_i_df = []
-                    temp_i_ind_outcomes = []
-
-                    flag_process_pool = False
-
-                    if flag_process_pool:
-                        pass
-                        # with ProcessPoolExecutor() as executor:
-                        #     results = list(executor.map(compute_one_run, data_inputs))
-                    else:
-                        #for i in range(total_runs):
-                        for run_index in range(total_runs):
-                            iter_start_time = time.time()
-    
-                            monthly_seeds_for_this_run = run_seeds_matrix[run_index]
-    
-                            # Use the exact same seed to generate identical starting parameters
-                            param_rng = np.random.default_rng(monthly_seeds_for_this_run[0])
-                            i_param = get_parameters(rng=param_rng, county=selected_county)
-                            i_param = calculate_derived_parameters(i_param)
-                            if ENABLE_PARAM_DEBUG_REPORT and run_index == 0:
-                                debug_loader_param = copy.deepcopy(i_param)
-                            i_param.update({"E": i_E, "S": i_S, "HSS": i_HSS})
-                            sync_param_momish_from_hss(i_param, i_HSS, i_flags)
-                            if ENABLE_PARAM_DEBUG_REPORT and run_index == 0:
-                                debug_final_param = copy.deepcopy(i_param)
-    
-                            # Pass the exact same ARRAY of monthly seeds
-                            i_df_i, i_ind_outcomes_i, _ = run_model_dash(i_param, i_flags, n_months, int_period, base_seed=monthly_seeds_for_this_run)
-    
-                            i_df_i["Run"] = run_index + 1
-                            i_ind_outcomes_i["Run"] = run_index + 1
-                            i_ind_outcomes_i["Scenario"] = st.session_state.target_label if compare_two_interventions else "Intervention"
-                            temp_i_df.append(i_df_i)
-                            temp_i_ind_outcomes.append(i_ind_outcomes_i)
-                            # Reset flags and initialize parameters for each run
-                            # rng_param = np.random.default_rng(base_seed)
-                            # i_param = get_parameters(rng = rng_param)
-                            # i_param = calculate_derived_parameters(i_param)
-                            # #st.text(i_param)
-                            # i_param.update({"E": i_E, "S": i_S, "HSS": i_HSS})
-    
-                            # # Run intervention model
-                            # rng_model = np.random.default_rng(base_seed)
-                            # i_df_i, i_ind_outcomes_i, _ = run_model_dash(i_param, i_flags, n_months, int_period, base_seed = base_seed)
-                            # i_df_i["Run"] = run_index + 1
-                            # i_ind_outcomes_i["Run"] = run_index + 1
-                            # i_ind_outcomes_i["Scenario"] = "Intervention"
-                            # temp_i_df.append(i_df_i)
-                            # temp_i_ind_outcomes.append(i_ind_outcomes_i)
-    
-                            # Time tracking & progress update
-                            iter_time_taken = time.time() - iter_start_time
-                            avg_time_per_run = iter_time_taken if avg_time_per_run is None else (
-                                                                                                            avg_time_per_run * run_index + iter_time_taken) / (
-                                                                                                            run_index + 1)
-                            remaining_time = avg_time_per_run * (total_runs - (run_index + 1))
-                            progress_bar.progress((run_index + 1) / total_runs)
-                            status.text(f"⏳ Running Comparison Model... {run_index + 1}/{total_runs} runs completed. "
-                                        f"Estimated time left: {remaining_time / 60:.1f} min.")
-                            # st.text(f"CPU usage: {psutil.cpu_percent()}%")
-                            # usage_per_core = psutil.cpu_percent(percpu=True)
-                            # for i, usage in enumerate(usage_per_core):
-                            #     st.text(f"Core {i}: {usage}%")
-
-                    # Store intervention results
-                    i_df = pd.concat(temp_i_df, ignore_index=True)
-                    i_ind_outcomes = pd.concat(temp_i_ind_outcomes, ignore_index=True)
-
-                    # In A/B mode, also run plain baseline for multiple runs
-                    if compare_two_interventions:
-                        status.text("⏳ Running Plain Baseline for A/B column comparison...")
-                        temp_ab_base_df = []
-                        temp_ab_base_ind_outcomes = []
-                        for run_index in range(total_runs):
-                            monthly_seeds_for_this_run = run_seeds_matrix[run_index]
-                            param_rng = np.random.default_rng(monthly_seeds_for_this_run[0])
-                            base_param = get_parameters(rng=param_rng, county=selected_county)
-                            base_param = calculate_derived_parameters(base_param)
-                            base_flags = reset_flags()
-                            base_HSS = reset_HSS(slider_params)
-                            base_S = reset_S(slider_params)
-                            base_E = reset_E()
-                            base_param.update({"E": base_E, "S": base_S, "HSS": base_HSS})
-                            ab_base_df_i, ab_base_ind_outcomes_i, _ = run_model_dash(base_param, base_flags, n_months, int_period, base_seed=monthly_seeds_for_this_run)
-                            ab_base_df_i["Run"] = run_index + 1
-                            ab_base_ind_outcomes_i["Run"] = run_index + 1
-                            ab_base_ind_outcomes_i["Scenario"] = "Baseline"
-                            temp_ab_base_df.append(ab_base_df_i)
-                            temp_ab_base_ind_outcomes.append(ab_base_ind_outcomes_i)
-
-                        st.session_state.ab_base_df = pd.concat(temp_ab_base_df, ignore_index=True)
-                        st.session_state.ab_base_ind_outcomes = pd.concat(temp_ab_base_ind_outcomes, ignore_index=True)
-
-                    status.text("✅ Model Run Completed!")
+                status.text("✅ Model Run Completed!")
 
                 # Total execution time
                 total_time = time.time() - start_time
@@ -2156,7 +2074,7 @@ with st.sidebar:
                 st.session_state.int_period = int_period
                 st.session_state.b_param = b_param
                 st.session_state.i_param = i_param
-                st.session_state.n_runs = MODEL["n_runs"]
+                st.session_state.n_runs = effective_n_runs
                 st.session_state.model_finished = True
 
                 if ENABLE_PARAM_DEBUG_REPORT and debug_loader_param is not None and debug_final_param is not None:
