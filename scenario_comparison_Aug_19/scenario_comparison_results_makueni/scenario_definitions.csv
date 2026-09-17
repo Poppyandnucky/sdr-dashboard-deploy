@@ -1,0 +1,30 @@
+scenario,intervention,level,description
+mentors_base,MENTORS,base,No HSS; MENTORS off
+mentors_current,MENTORS,current,County-specific current implementation index; all single interventions on
+mentors_moderate,MENTORS,moderate,50% implementation index; all single interventions on
+mentors_high,MENTORS,high,95% implementation index; all single interventions on
+prompts_base,PROMPTS,base,All off
+prompts_current,PROMPTS,current,County-specific current implementation index; 1.02 RR effectiveness
+prompts_moderate,PROMPTS,moderate,50% implementation index; 1.18 RR effectiveness
+prompts_high,PROMPTS,high,95% implementation index; 1.35 RR effectiveness
+prompts_high_shift,PROMPTS,high_shift,PROMPTS high plus conservative delivery shift and matched facility expansion
+blood_base,Blood tracking,base,All off
+blood_current,Blood tracking,current,Blood tracking on; 15% adoption
+blood_moderate,Blood tracking,moderate,Blood tracking on; 30% adoption
+blood_high,Blood tracking,high,Blood tracking on; 50% adoption
+referral_base,Transfer & EMT,base,All off
+referral_current,Transfer & EMT,current,County-specific referral_implementation_index; 1 hour delay shift
+referral_moderate,Transfer & EMT,moderate,50% referral_implementation_index; 1 hour delay shift
+referral_high,Transfer & EMT,high,95% referral_implementation_index; 1 hour delay shift
+pulse_base,PULSE,base,All off
+pulse_current,PULSE,current,County-specific current implementation index
+pulse_moderate,PULSE,moderate,50% implementation index
+pulse_high,PULSE,high,95% implementation index
+fqa_base,FQA,base,PULSE current; FQA off; all single interventions on
+fqa_current,FQA,current,County-specific current FQA index; PULSE current; all single interventions on; 10% amplification
+fqa_moderate,FQA,moderate,50% FQA implementation index; PULSE current; all single interventions on; 10% amplification
+fqa_high,FQA,high,95% FQA implementation index; PULSE current; all single interventions on; 30% amplification
+combined_base,All,base,"No HSS; all MOMISH interventions off, all single interventions off"
+combined_current,All,current,County-specific current implementation index for all interventions; all single interventions on; Blood tracking 15% adoption; Transfer & EMT 1 hour delay shift; PROMPTS 1.02 RR effectiveness; FQA 10% amplification; pulse_implementation_boost=0.25
+combined_moderate,All,moderate,50% implementation index for all interventions; all single interventions on; Blood tracking 30% adoption; Transfer & EMT 1 hour delay shift; PROMPTS 1.18 RR effectiveness; FQA 10% amplification; pulse_implementation_boost=0.5
+combined_high,All,high,95% implementation index for all interventions; all single interventions on; Blood tracking 50% adoption; Transfer & EMT 1 hour delay shift; PROMPTS 1.35 RR effectiveness; FQA 30% amplification; pulse_implementation_boost=0.75
