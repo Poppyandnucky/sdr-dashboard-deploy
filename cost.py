@@ -22,6 +22,7 @@ def get_cost_parameters():
         "useful_life_dict": {
             "Doppler": 7,
             "CTG": 7,
+            "POCUS": 5,
             "Infra": 20,
             "Equip": 5,
             "Taxi_Setup": 5,
@@ -532,6 +533,37 @@ def calculate_general_equipment_costs(intervention_df, unit_costs, cost_paramete
     )
 
 
+def calculate_pocus_costs(
+    intervention_df,
+    unit_costs,
+    cost_parameters,
+    discount_rate,
+    num_pocus=0,
+    include_pocus=False,
+):
+    """Calculate POCUS capital costs: one POCUS machine per L2/3, L4, and L5 facility."""
+    if not include_pocus or num_pocus <= 0:
+        return pd.DataFrame(
+            columns=["Run", "year", "cost_type", "cost_yearly", "cost_discounted_yearly"]
+        )
+    intervention = _with_run_month_year(intervention_df)
+    purchases = pd.DataFrame(
+        {
+            "Run": intervention["Run"].drop_duplicates().astype(int),
+            "purchase_year": 1,
+            "purchased": int(math.ceil(num_pocus)),
+        }
+    )
+    return _annualize_purchase_blocks(
+        purchases,
+        unit_costs["POCUS"],
+        cost_parameters["useful_life_dict"]["POCUS"],
+        discount_rate,
+        int(intervention["year"].max()),
+        "Equipment (POCUS)",
+    )
+
+
 def calculate_sensor_costs(
     baseline_df,
     intervention_df,
@@ -658,6 +690,8 @@ def calculate_sdr_costs(
     scenario_name="Intervention",
     scenario_tier=None,
     include_general_equipment=True,
+    include_pocus=False,
+    num_pocus=0,
 ):
     """Calculate Appendix B-style SDR costs from baseline/intervention outputs.
 
@@ -709,6 +743,16 @@ def calculate_sdr_costs(
                 intervention_df, unit_costs, cost_parameters, discount_rate
             )
         )
+    capital_components.append(
+        calculate_pocus_costs(
+            intervention_df,
+            unit_costs,
+            cost_parameters,
+            discount_rate,
+            num_pocus=num_pocus,
+            include_pocus=include_pocus,
+        )
+    )
     capital_components.append(
         calculate_sensor_costs(
             baseline_df,
@@ -790,6 +834,7 @@ def clean_cost_table(df):
         {
             "Equipment (Doppler)": "Equipment (Sensors)",
             "Equipment (CTG)": "Equipment (Sensors)",
+            "Equipment (POCUS)": "POCUS",
         }
     )
     return (

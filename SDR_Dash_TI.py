@@ -3353,6 +3353,10 @@ if st.session_state.b_df is not None and st.session_state.i_df is not None:
                             scenario_name="Intervention",
                             scenario_tier=infer_sdr_cost_tier(i_param["HSS"]),
                             include_general_equipment=bool(i_flags.get("flag_equipment", 1)),
+                            include_pocus=bool(i_flags.get("flag_us", 0)),
+                            num_pocus=(
+                                i_param["num_L2/3"] + i_param["num_L4"] + i_param["num_L5"]
+                            ),
                         )
                     except Exception as exc:
                         st.error(f"Cost calculation failed: {exc}")
