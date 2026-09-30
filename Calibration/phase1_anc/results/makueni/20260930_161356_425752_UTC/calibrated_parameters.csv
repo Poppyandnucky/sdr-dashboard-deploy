@@ -1,0 +1,4 @@
+parameter,value,role,lower_bound,upper_bound
+home_lowrisk,0.22338643006946077,fitted,0.0,0.4
+close_to_L23,0.2616847889152829,fitted,0.05,0.98
+L23_highrisk,0.020921405205115207,derived,,
