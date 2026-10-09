@@ -1,5 +1,0 @@
-scenario,intervention,level,description
-diagnosis_base,Baseline,base,"No diagnosis intervention flags: flag_us=0, flag_intrasensor=0, flag_sensor_ai=0"
-pocus,POCUS,direct_flags,"flag_us=1, flag_intrasensor=0, flag_sensor_ai=0"
-intrapartum_sensors,Intrapartum sensors,direct_flags,"flag_us=0, flag_intrasensor=1, flag_sensor_ai=0"
-ai_intrapartum_sensors,AI Intrapartum sensors,direct_flags,"flag_us=0, flag_intrasensor=1, flag_sensor_ai=1"

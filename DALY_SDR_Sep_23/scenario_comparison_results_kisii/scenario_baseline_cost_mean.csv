@@ -1,2 +1,0 @@
-scenario,intervention,level,total_cost_usd,pm_overhead_cost_usd,referral_transfer_cost_usd,service_delivery_cost_usd,labor_cost_usd,equipment_cost_usd,total_discounted_cost_usd,maternal_dalys,neonatal_dalys,total_dalys,cost_category_sum_check_usd,total_daly_sum_check,final_year
-diagnosis_base,Baseline,base,50563993.666269064,0.0,1757004.2768336409,24037179.333436295,21143207.72200772,3626602.3339914065,44427334.775780655,8374.198019953476,1175303.0516080006,1183677.249627954,0.0,1.862645149230957e-11,10.0
